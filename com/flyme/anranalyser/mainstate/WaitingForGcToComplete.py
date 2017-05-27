@@ -1,0 +1,2 @@
+class WaitingForGcToComplete:
+    pass
