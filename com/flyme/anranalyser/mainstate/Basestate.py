@@ -8,7 +8,20 @@ class Basestate:
         self.anrObj = anrObj
         self.matched_state_list = list()
 
-    #    def get_output_content(self):
+    def get_main_list(self):
+        return re.findall('at (.*?)(\n|\r\n)', self.anrObj.mainTrace['trace'])
+
+    def get_key(self):
+        return self.__get_key_inner(self.anrObj.mainTrace)
+
+    def __get_key_inner(self, mainTrace):
+        key = mainTrace['thread_state'] + ' '
+        main_trace_list = re.findall('at (.*?)(\n|\r\n)', mainTrace['trace'])
+        for i in main_trace_list:
+            key += (i[0] + ' ')
+        return key
+
+    # def get_output_content(self):
     #        mainConcernedTrace = ''
     #        for i in self.anrObj.mainConcernedTrace["__thread_sequece__"]:
     #            mainConcernedTrace += self.anrObj.mainConcernedTrace[i][
@@ -54,7 +67,7 @@ class Basestate:
         return True
 
     def generate_merge(self, merge):
-        message = self.get_base_info() + '\n\n' + self.__get_main_trace() \
+        message = self.get_base_info() + '\n\n' + self.get_main_trace() \
                   + '\n\n' + self.get_cpuusage()
         self.generate_to_merge_file(message, merge)
 
@@ -66,9 +79,19 @@ class Basestate:
         fd.write(message)
         fd.close()
 
-    def generate_bug_and_undetermined_if_needed(self, bug, undetermined):
+    def generate_bug_and_undetermined_if_needed(self, bug, undetermined,
+                                                notbug):
+        self.generate_undetermined(undetermined)
+
+    def generate_bug(self, bug):
+        shutil.copy(self.merge_filename, os.path.join(bug, self.filename))
+
+    def generate_undetermined(self, undetermined):
         shutil.copy(self.merge_filename,
                     os.path.join(undetermined, self.filename))
+
+    def generate_notbug(self, notbug):
+        shutil.copy(self.merge_filename, os.path.join(notbug, self.filename))
 
     def __get_generate_from(self):
         message = 'Generated from:\n'
@@ -104,7 +127,7 @@ class Basestate:
                '\n\n' \
                + self.__get_trace_time()
 
-    def __get_main_trace(self):
+    def get_main_trace(self):
         return 'Main concerned trace:\n' + self.anrObj.mainTrace['trace']
 
     def get_cpuusage(self):

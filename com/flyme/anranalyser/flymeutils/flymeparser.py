@@ -2,19 +2,20 @@ import os
 import shutil
 import gzip
 import re
-import sys
 from com.flyme.anranalyser.flymeutils.BaseAnrObj import BaseAnrObj
 from com.flyme.anranalyser.flymeutils import flymeprint
 
 from com.flyme.anranalyser.mainstate.Blocked import Blocked
 from com.flyme.anranalyser.mainstate.Native import Native
 from com.flyme.anranalyser.mainstate.Otherstate import Otherstate
-from com.flyme.anranalyser.mainstate import Runnable
-from com.flyme.anranalyser.mainstate import Suspended
-from com.flyme.anranalyser.mainstate import TimedWaiting
-from com.flyme.anranalyser.mainstate import Waiting
-from com.flyme.anranalyser.mainstate import WaitingForGcToComplete
-from com.flyme.anranalyser.mainstate import WaitingPerformingGc
+from com.flyme.anranalyser.mainstate.Runnable import Runnable
+from com.flyme.anranalyser.mainstate.Suspended import Suspended
+from com.flyme.anranalyser.mainstate.TimedWaiting import TimedWaiting
+from com.flyme.anranalyser.mainstate.Waiting import Waiting
+from com.flyme.anranalyser.mainstate.WaitingForGcToComplete import \
+    WaitingForGcToComplete
+from com.flyme.anranalyser.mainstate.WaitingPerformingGc import \
+    WaitingPerformingGc
 
 
 def parseDropbox(dropbox, anr):
@@ -31,15 +32,18 @@ def parseDropbox(dropbox, anr):
     bug = os.path.join(dropbox, 'bug')
     # undetermined entry which should by analysed manually
     undetermined = os.path.join(dropbox, 'undetermined')
+    # notbug directory
+    notbug = os.path.join(dropbox, 'notbug')
 
-    if not cleanAndBuildDir(extractall, merge, bug, undetermined):
+    if not cleanAndBuildDir(extractall, merge, bug, undetermined, notbug):
         flymeprint.errorprint('can not cleanAndBuildDir')
         return
 
-    state_obj_list = list()
+    state_obj_dict = dict()
     for entry in listDir:
         # only system_app_anr is concerned
-        match = re.match('(system_app_anr|data_app_anr).*\.gz', entry)
+        # match = re.match('(system_app_anr|data_app_anr).*\.gz', entry)
+        match = re.match('(system_app_anr).*\.gz', entry)
         if not match:
             continue
         print('start process ---> ' + entry)
@@ -55,42 +59,44 @@ def parseDropbox(dropbox, anr):
             flymeprint.errorprint(entry + ' ---> 信息不完整')
             continue
         if anrobj.mainTrace["thread_state"] == 'Blocked':
-            state_obj_list.append(Blocked(anrobj))
+            obj = Blocked(anrobj)
         elif anrobj.mainTrace["thread_state"] == 'Native':
-            state_obj_list.append(Native(anrobj))
+            obj = Native(anrobj)
         elif anrobj.mainTrace["thread_state"] == 'Runnable':
-            state_obj_list.append(Runnable(anrobj))
+            obj = Runnable(anrobj)
         elif anrobj.mainTrace["thread_state"] == 'Suspended':
-            state_obj_list.append(Suspended(anrobj))
+            obj = Suspended(anrobj)
         elif anrobj.mainTrace["thread_state"] == 'TimedWaiting':
-            state_obj_list.append(TimedWaiting(anrobj))
+            obj = TimedWaiting(anrobj)
         elif anrobj.mainTrace["thread_state"] == 'Waiting':
-            state_obj_list.append(Waiting(anrobj))
+            obj = Waiting(anrobj)
         elif anrobj.mainTrace["thread_state"] == 'WaitingForGcToComplete':
-            state_obj_list.append(WaitingForGcToComplete(anrobj))
+            obj = WaitingForGcToComplete(anrobj)
         elif anrobj.mainTrace["thread_state"] == 'WaitingPerformGc':
-            state_obj_list.append(WaitingPerformingGc(anrobj))
+            obj = WaitingPerformingGc(anrobj)
         else:
-            state_obj_list.append(Otherstate(anrobj))
+            obj = Otherstate(anrobj)
+        append_to_merge_or_match(obj, state_obj_dict)
         print('end process ---> ' + entry)
 
-    merge_and_generate_report(state_obj_list, merge, bug, undetermined)
+    generate_report(state_obj_dict.values(), merge, bug, undetermined, notbug)
 
 
-def merge_and_generate_report(state_obj_list, merge, bug, undetermined):
+def append_to_merge_or_match(stateObj, state_obj_dict):
+    key = stateObj.get_key()
+    if key in state_obj_dict:
+        print('duplication')
+        state_obj_dict[key].matched_state_list.append(stateObj)
+    else:
+        state_obj_dict[key] = stateObj
+
+
+def generate_report(state_obj_list, merge, bug, undetermined, notbug):
     if len(state_obj_list) == 0:
         return
-    merged_state_obj_list = list()
-    merged_state_obj_list.append(state_obj_list.pop(0))
     for i in state_obj_list:
-        for j in merged_state_obj_list:
-            if i.is_match(j):
-                j.matched_state_list.append(j)
-            else:
-                merged_state_obj_list.append(j)
-    for i in merged_state_obj_list:
         i.generate_merge(merge)
-        i.generate_bug_and_undetermined_if_needed(bug, undetermined)
+        i.generate_bug_and_undetermined_if_needed(bug, undetermined, notbug)
 
 
 def is_a_valid_anr_obj(anrobj):
@@ -101,7 +107,7 @@ def is_a_valid_anr_obj(anrobj):
         anrobj.time_and_filepath):
         return False
     if (
-            'trace' not in anrobj.mainTrace or 'thread_state' not in
+                    'trace' not in anrobj.mainTrace or 'thread_state' not in
                 anrobj.mainTrace):
         return False
     if ('content' not in anrobj.allMain):
@@ -187,9 +193,17 @@ def parseContent(content, filename, anrPath):
     cpuUsage = getCpuUsage(content)
     pid = getPid(content)
 
-    traceTime = getTraceTime(content, packageName, pid)
     anrTime = getDropboxAnrTime(content, packageName)
+    if len(anrTime) == 0:
+        flymeprint.errorprint('no dropbox anr time')
+
+    traceTime = getTraceTime(content, packageName, pid)
+    if len(traceTime) == 0:
+        flymeprint.errorprint('no dropbox trace time')
+
     matchedTime = getMatchedTime(traceTime, anrTime)
+    if len(matchedTime) == 0:
+        flymeprint.errorprint('dropbox anr time does not match trace time')
 
     allMain = getWholeMain(content, packageName, pid, matchedTime, anrTime,
                            anrPath)
@@ -271,6 +285,7 @@ def parse_data_anr(packageName, pid, anrTime, anrPath):
             allMain = getWholeMainFinal(pid, matchedTime, content)
             allMain['anr_trace_file_name'] = wholeAnrPath
             return allMain
+    flymeprint.errorprint('no data anr time matches')
     return dict()
 
 

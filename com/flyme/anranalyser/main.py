@@ -1,8 +1,10 @@
 import datetime
 from com.flyme.anranalyser.flymeutils import flymeparser
 
-dropboxPath = '/home/liucong/temp/log/dropbox'
-anrPath = '/home/liucong/temp/log/anr'
+dropboxPath = '/home/liucong/temp/log/544309/22/dropbox'
+# dropboxPath = '/home/liucong/temp/log/dropbox'
+anrPath = '/home/liucong/temp/log/544309/22/anr'
+
 
 def main():
     start_time = datetime.datetime.now()
@@ -10,4 +12,6 @@ def main():
     end_time = datetime.datetime.now()
     print('Time took: ' + str((end_time - start_time).seconds) + ' seconds')
 
-main()
+
+if __name__ == '__main__':
+    main()
