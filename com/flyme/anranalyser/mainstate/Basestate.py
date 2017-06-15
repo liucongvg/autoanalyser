@@ -9,7 +9,7 @@ class Basestate:
         self.matched_state_list = list()
 
     def get_main_list(self):
-        return re.findall('at (.*?)(\n|\r\n)', self.anrObj.mainTrace['trace'])
+        return re.findall('  at (.*?)(\n|\r\n)', self.anrObj.mainTrace['trace'])
 
     def get_key(self):
         return self.__get_key_inner(self.anrObj.mainTrace)
@@ -117,6 +117,12 @@ class Basestate:
     def __get_trace_time(self):
         return 'Trace anr time:\n' + self.anrObj.time_and_filepath['trace_time']
 
+    def __get_anr_in_time(self):
+        if 'anr_in_time_str' not in self.anrObj.time_and_filepath:
+            return 'ANR in time:\nnull'
+        return 'ANR in time:\n' + self.anrObj.time_and_filepath[
+            'anr_in_time_str']
+
     def get_base_info(self):
         return self.__get_generate_from() + '\n\n' + self.__get_package_name(
 
@@ -125,7 +131,7 @@ class Basestate:
                self.__get_repeat_time() + '\n\n' + \
                self.__get_event_log_anr_time() + \
                '\n\n' \
-               + self.__get_trace_time()
+               + self.__get_trace_time() + '\n\n' + self.__get_anr_in_time()
 
     def get_main_trace(self):
         return 'Main concerned trace:\n' + self.anrObj.mainTrace['trace']

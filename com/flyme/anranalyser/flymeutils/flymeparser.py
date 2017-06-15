@@ -18,7 +18,7 @@ from com.flyme.anranalyser.mainstate.WaitingPerformingGc import \
     WaitingPerformingGc
 
 
-def parseDropbox(dropbox, anr):
+def parseDropbox(dropbox, anr, event_log_path_list):
     try:
         listDir = os.listdir(dropbox)
     except Exception as ex:
@@ -54,7 +54,7 @@ def parseDropbox(dropbox, anr):
         if wholeFile == '':
             continue
 
-        anrobj = parseContent(wholeFile, fullNew, anr)
+        anrobj = parseContent(wholeFile, fullNew, anr, event_log_path_list)
         if not is_a_valid_anr_obj(anrobj):
             flymeprint.errorprint(entry + ' ---> 信息不完整')
             continue
@@ -100,7 +100,7 @@ def generate_report(state_obj_list, merge, bug, undetermined, notbug):
 
 
 def is_a_valid_anr_obj(anrobj):
-    if (anrobj.packageName == 'null' or anrobj.pid == 'null'):
+    if (anrobj.packageName == 'null'):
         return False
     if ('anr_time' not in anrobj.time_and_filepath or 'trace_time' not in
         anrobj.time_and_filepath or 'dropbox_file_name' not in
@@ -185,28 +185,32 @@ def extractGzToDest(src, dest):
     return wholeFile
 
 
-def parseContent(content, filename, anrPath):
+def parseContent(content, filename, anrPath, event_log_path_list):
     # processName = getProcessName(content)
     packageName = getPackageName(content)
     anrReason = getAnrReason(content)
     # build = getbuild(content)
     cpuUsage = getCpuUsage(content)
-    pid = getPid(content)
 
-    anrTime = getDropboxAnrTime(content, packageName)
+    anrTime = getAnrTime(content, packageName)
+    pid = getPid(content, packageName)
+    anr_in_time = get_anr_in_time(packageName, content)
     if len(anrTime) == 0:
         flymeprint.errorprint('no dropbox anr time')
+        anrTime = getEventLogAnrTime(event_log_path_list, packageName)
+        if (len(anrTime) == 0):
+            flymeprint.errorprint('no eventlog anr time')
 
-    traceTime = getTraceTime(content, packageName, pid)
+    traceTime = getTraceTime(content, packageName)
     if len(traceTime) == 0:
         flymeprint.errorprint('no dropbox trace time')
 
-    matchedTime = getMatchedTime(traceTime, anrTime)
+    matchedTime = getMatchedTime(traceTime, anrTime, anr_in_time)
     if len(matchedTime) == 0:
-        flymeprint.errorprint('dropbox anr time does not match trace time')
+        flymeprint.errorprint('no dropbox trace matches')
 
-    allMain = getWholeMain(content, packageName, pid, matchedTime, anrTime,
-                           anrPath)
+    allMain = getWholeMain(content, packageName, matchedTime, anrTime,
+                           anrPath, anr_in_time)
     # renderThreadTrace = getRenderThreadTrace(allMain['content'])
     # binderTrace = getBinderTrace(allMain['content'])
 
@@ -221,6 +225,9 @@ def parseContent(content, filename, anrPath):
     if 'anr_trace_file_name' in allMain:
         time_and_filepath['anr_trace_file_name'] = allMain[
             'anr_trace_file_name']
+    if 'anr_time_str' in anr_in_time:
+        time_and_filepath['anr_in_time_str'] = anr_in_time['anr_time_str']
+
     time_and_filepath['dropbox_file_name'] = filename
 
     anrobj = BaseAnrObj(time_and_filepath, packageName, anrReason, cpuUsage,
@@ -230,8 +237,32 @@ def parseContent(content, filename, anrPath):
     return anrobj
 
 
-def getMatchedTime(traceTime, anrTime):
+def getEventLogAnrTime(event_log_path_list, packageName):
+    anrTime = dict()
+    for event_log_path in event_log_path_list:
+        try:
+            listDir = os.listdir(event_log_path)
+        except Exception as ex:
+            flymeprint.errorprint(ex)
+            return anrTime
+        for i in listDir:
+            match = re.match('events.*', i)
+            if match:
+                if i.endswith('.gz'):
+                    src = os.path.join(event_log_path, i)
+                    dest = os.path.join(event_log_path, i.rstrip('.gz'))
+                    content = extractGzToDest(src, dest)
+                else:
+                    content = open(os.path.join(event_log_path, i)).read()
+                temp_anr_time = getAnrTime(content, packageName)
+                for i in temp_anr_time.keys():
+                    anrTime[i] = temp_anr_time[i]
+    return anrTime
+
+
+def getMatchedTime(traceTime, anrTime, anr_in_time):
     matchedTime = dict()
+    matchedTimeList = list()
     for i in anrTime.keys():
         for j in traceTime.keys():
             # if anrTime[i] < 1 * 60 * 60 * 1000 and traceTime[j] > 11 * 60 *
@@ -254,55 +285,85 @@ def getMatchedTime(traceTime, anrTime):
                                         1000 +
                                         60 * 1000 - anrTime[i] + traceTime[
                             j]) < 3 * 1000:
-                    matchedTime['anr_time'] = i
-                    matchedTime['trace_time'] = j
-                    break
+                    # matchedTime['anr_time'] = i
+                    # matchedTime['trace_time'] = j
+                    matchedTimeList.append({'anr_time': i, 'trace_time': j})
+                    continue
                     # matchedTime.append(
                     #     {'anr_time': anrTime[i], 'trace_time': traceTime[j]})
                     # continue
             else:
-                if traceTime[j] - anrTime[i] < 3000:
+                if (traceTime[j] - anrTime[i] < 3000 and traceTime[j] - anrTime[
+                    i] >= 0) or (traceTime[j] // 1000 == anrTime[i] // 1000):
                     # matchedTime.append(
                     #     {'anr_time': anrTime[i], 'trace_time': traceTime[j]})
                     # continue
-                    matchedTime['anr_time'] = i
-                    matchedTime['trace_time'] = j
-                    break
+                    # matchedTime['anr_time'] = i
+                    # matchedTime['trace_time'] = j
+                    matchedTimeList.append({'anr_time': i, 'trace_time': j})
+                    continue
+
+    if len(matchedTimeList) == 0:
+        return matchedTime;
+    if 'anr_time' not in anr_in_time:
+        return matchedTimeList[0]
+
+    index = len(matchedTimeList) - 1
+    while anrTime[matchedTimeList[index]['anr_time']] > anr_in_time['anr_time']:
+        matchedTimeList.pop(index)
+        index = len(matchedTimeList) - 1
+        if (index < 0):
+            break
+    if len(matchedTimeList) == 0:
+        return matchedTime
+    matchedTime = matchedTimeList.pop(len(matchedTimeList) - 1)
+
+    if (len(matchedTimeList) > 0):
+        for i in matchedTimeList:
+            cur_anr_time_count = anrTime[i['anr_time']]
+            last_anr_time_count = anrTime[matchedTime['anr_time']]
+            anr_in_time_count = anr_in_time['anr_time']
+            if (cur_anr_time_count < anr_in_time_count) and (
+                        (anr_in_time_count - cur_anr_time_count) < (
+                                anr_in_time_count - last_anr_time_count)):
+                matchedTime = i
     return matchedTime
 
 
-def parse_data_anr(packageName, pid, anrTime, anrPath):
+def parse_data_anr(packageName, anrTime, anrPath, anr_in_time):
     anrentries = os.listdir(anrPath)
     for i in anrentries:
-        match = re.search('traces.*?\.txt', i)
+        match = re.match('traces.*?\.txt', i)
         if match:
             wholeAnrPath = os.path.join(anrPath, i)
             content = open(wholeAnrPath).read()
-            traceTime = getTraceTime(content, packageName, pid)
-            matchedTime = getMatchedTime(traceTime, anrTime)
+            traceTime = getTraceTime(content, packageName)
+            matchedTime = getMatchedTime(traceTime, anrTime, anr_in_time)
             if len(matchedTime) == 0:
                 continue
-            allMain = getWholeMainFinal(pid, matchedTime, content)
+            allMain = getWholeMainFinal(matchedTime, content)
             allMain['anr_trace_file_name'] = wholeAnrPath
             return allMain
     flymeprint.errorprint('no data anr time matches')
     return dict()
 
 
-def getWholeMain(content, packageName, pid, matchedTime, anrTime, anrPath):
+def getWholeMain(content, packageName, matchedTime, anrTime, anrPath,
+                 anr_in_time):
     if len(anrTime) == 0:
         return dict()
     if len(matchedTime) == 0:
-        return parse_data_anr(packageName, pid, anrTime, anrPath)
-    return getWholeMainFinal(pid, matchedTime, content)
+        return parse_data_anr(packageName, anrTime, anrPath, anr_in_time)
+    return getWholeMainFinal(matchedTime, content)
 
 
-def getWholeMainFinal(pid, matchedTime, content):
+def getWholeMainFinal(matchedTime, content):
     if 'trace_time' not in matchedTime or 'anr_time' not in matchedTime:
         return dict()
     match = re.search(
-        '----- pid ' + pid + ' at \d{4}-\d{2}-\d{2} ' + matchedTime[
-            'trace_time'] + ' -----' + "((.|\n)*?)" + "----- end " + pid + " -----",
+        '----- pid ' + '\d+' + ' at \d{4}-\d{2}-\d{2} ' + matchedTime[
+            'trace_time'] + ' -----' + "((.|\n)*?)" + "----- end " + '\d+' +
+        " -----",
         content)
     if not match:
         return dict()
@@ -351,14 +412,24 @@ def getCpuUsage(content):
     return match.group(4)
 
 
-def getPid(content):
-    match = re.search("(.|\n)*?----- pid ((\d)*)", content)
+def getPid(content, packageName):
+    # match = re.search(
+    #    "(.|\n)*?----- pid ((\d)*).*(\n|\r\n)Cmd line: " + packageName,
+    # content)
+
+    # if not match:
+    #    return "null"
+    # return match.group(2)
+    match = re.search(
+        '\d{2}-\d{2} \d{2}:\d{2}:\d{2}.\d{3}.*?am_anr.*?\[\d+,(\d+),'
+        '' + packageName,
+        content)
     if not match:
-        return "null"
-    return match.group(2)
+        return 'null'
+    return match.group(1)
 
 
-def getDropboxAnrTime(content, packageName):
+def getAnrTime(content, packageName):
     match = re.findall(
         '\d{2}-\d{2} (\d{2}:\d{2}:\d{2}.\d{3}).*?am_anr.*?' + packageName +
         '.*',
@@ -378,11 +449,32 @@ def getDropboxAnrTime(content, packageName):
     return anrTime
 
 
-def getTraceTime(content, pakcageName, pid):
+def get_anr_in_time(packageName, content):
+    anr_in_time = dict()
+    match = re.search(
+        '\d{2}-\d{2} ((\d{2}):(\d{2}):(\d{2}).(\d{3})).*ANR in ' + packageName,
+        content)
+    if not match:
+        return anr_in_time
+    whole_time = match.group(1)
+    hour = match.group(2)
+    minute = match.group(3)
+    second = match.group(4)
+    minisecond = match.group(5)
+    wholeMinisecond = int(minisecond) + int(second) * 1000 + int(
+        minute) * 60 * 1000 + int(hour) * \
+                              60 * 60 \
+                              * 1000
+    anr_in_time['anr_time_str'] = whole_time
+    anr_in_time['anr_time'] = wholeMinisecond
+    return anr_in_time
+
+
+def getTraceTime(content, pakcageName):
     traceTime = dict()  # key is string time, value is integer time
     match = re.findall(
-        '----- pid ' + pid + ' at \d*-\d*-\d* (\d{2}:\d{2}:\d{2}) -----\s{1,'
-                             '2}Cmd line: ' + pakcageName,
+        '----- pid ' + '\d+' + ' at \d*-\d*-\d* (\d{2}:\d{2}:\d{2}) -----\s{1,'
+                               '2}Cmd line: ' + pakcageName,
         content)
     for i in match:
         match = re.search('(\d{2}):(\d{2}):(\d{2})', i)

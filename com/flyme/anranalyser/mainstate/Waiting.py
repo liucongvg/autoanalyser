@@ -15,6 +15,10 @@ class Waiting(Basestate):
             'java.lang.Thread.join') != -1 and main_trace_list[2][0].find(
             self.anrObj.packageName) != -1:
             reportBug = True
+        elif len(main_trace_list) >= 2 and main_trace_list[0][0].find(
+                'java.lang.Object.wait!') != -1 and main_trace_list[1][0].find(
+                self.anrObj.packageName) != -1:
+            reportBug = True
         if reportBug:
             Basestate.generate_bug(self, bug)
         else:
