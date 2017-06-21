@@ -3,9 +3,6 @@
   <component name="ChangeListManager">
     <list default="true" id="bdefb856-a0a5-4fa1-94c2-68bdc9175c13" name="Default" comment="">
       <change type="MODIFICATION" beforePath="$PROJECT_DIR$/.idea/workspace.xml" afterPath="$PROJECT_DIR$/.idea/workspace.xml" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/com/flyme/anranalyser/flymeutils/flymeparser.py" afterPath="$PROJECT_DIR$/com/flyme/anranalyser/flymeutils/flymeparser.py" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/com/flyme/anranalyser/main.py" afterPath="$PROJECT_DIR$/com/flyme/anranalyser/main.py" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/com/flyme/anranalyser/mainstate/Basestate.py" afterPath="$PROJECT_DIR$/com/flyme/anranalyser/mainstate/Basestate.py" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="TRACKING_ENABLED" value="true" />
@@ -51,10 +48,10 @@
           </provider>
         </entry>
       </file>
-      <file leaf-file-name="main.py" pinned="false" current-in-tab="false">
+      <file leaf-file-name="main.py" pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/com/flyme/anranalyser/main.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="512">
+            <state relative-caret-position="544">
               <caret line="17" column="0" lean-forward="false" selection-start-line="17" selection-start-column="0" selection-end-line="17" selection-end-column="0" />
               <folding>
                 <element signature="e#0#15#0" expanded="true" />
@@ -73,7 +70,7 @@
           </provider>
         </entry>
       </file>
-      <file leaf-file-name="Basestate.py" pinned="false" current-in-tab="true">
+      <file leaf-file-name="Basestate.py" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/com/flyme/anranalyser/mainstate/Basestate.py">
           <provider selected="true" editor-type-id="text-editor">
             <state relative-caret-position="104">
@@ -459,7 +456,7 @@
     <servers />
   </component>
   <component name="ToolWindowManager">
-    <frame x="50" y="-11" width="1871" height="1092" extended-state="7" />
+    <frame x="50" y="-11" width="1871" height="1092" extended-state="6" />
     <editor active="true" />
     <layout>
       <window_info id="Project" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" show_stripe_button="true" weight="0.13108614" sideWeight="0.5" order="0" side_tool="false" content_ui="combo" />
@@ -860,16 +857,6 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/com/flyme/anranalyser/main.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="512">
-          <caret line="17" column="0" lean-forward="false" selection-start-line="17" selection-start-column="0" selection-end-line="17" selection-end-column="0" />
-          <folding>
-            <element signature="e#0#15#0" expanded="true" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/com/flyme/anranalyser/flymeutils/flymeparser.py">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="96">
@@ -884,6 +871,16 @@
           <caret line="69" column="30" lean-forward="false" selection-start-line="69" selection-start-column="30" selection-end-line="69" selection-end-column="30" />
           <folding>
             <element signature="e#0#9#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/com/flyme/anranalyser/main.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="544">
+          <caret line="17" column="0" lean-forward="false" selection-start-line="17" selection-start-column="0" selection-end-line="17" selection-end-column="0" />
+          <folding>
+            <element signature="e#0#15#0" expanded="true" />
           </folding>
         </state>
       </provider>
