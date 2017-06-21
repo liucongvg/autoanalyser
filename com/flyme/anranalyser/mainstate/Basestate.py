@@ -16,9 +16,14 @@ class Basestate:
 
     def __get_key_inner(self, mainTrace):
         key = mainTrace['thread_state'] + ' '
-        main_trace_list = re.findall('at (.*?)(\n|\r\n)', mainTrace['trace'])
+        main_trace_list = re.findall('at (.*?)\(.*?\)(\n|\r\n)',
+                                     mainTrace['trace'])
+        match_count = 0
         for i in main_trace_list:
             key += (i[0] + ' ')
+            match_count += 1
+            if match_count >= 3:
+                break
         return key
 
     # def get_output_content(self):
@@ -59,11 +64,18 @@ class Basestate:
             return False
         l_list = re.findall('at (.*?)\s', l_trace)
         r_list = re.findall('at (.*?)\s', r_trace)
-        if len(l_list) != len(r_list):
-            return False
-        for i in range(len(l_list)):
+        # if len(l_list) != len(r_list):
+        #    return False
+        if len(l_list) >= len(r_list):
+            range = len(r_list)
+        else:
+            range = len(l_list)
+        match_times = 0;
+        for i in range:
             if l_list[i] != r_list[i]:
                 return False
+            if (++match_times >= 3):
+                return True
         return True
 
     def generate_merge(self, merge):

@@ -18,43 +18,52 @@ from com.flyme.anranalyser.mainstate.WaitingPerformingGc import \
     WaitingPerformingGc
 
 
-def parseDropbox(dropbox, anr, event_log_path_list):
+def parseDropbox(root_path):
     try:
-        listDir = os.listdir(dropbox)
+        is_dir = os.path.isdir(root_path)
+        if not is_dir:
+            flymeprint.errorprint('invalid root dir:' + root_path)
     except Exception as ex:
         flymeprint.errorprint(ex)
         return
+    # anranalyser
+    anranalyser = os.path.join(root_path, '__anranalyser__')
     # extract
-    extractall = os.path.join(dropbox, 'extractall')
+    extractall = os.path.join(anranalyser, 'extractall')
     # use main stack to merge content
-    merge = os.path.join(dropbox, 'merge')
+    merge = os.path.join(anranalyser, 'merge')
     # report bug according to policy
-    bug = os.path.join(dropbox, 'bug')
+    bug = os.path.join(anranalyser, 'bug')
     # undetermined entry which should by analysed manually
-    undetermined = os.path.join(dropbox, 'undetermined')
+    undetermined = os.path.join(anranalyser, 'undetermined')
     # notbug directory
-    notbug = os.path.join(dropbox, 'notbug')
+    notbug = os.path.join(anranalyser, 'notbug')
 
     if not cleanAndBuildDir(extractall, merge, bug, undetermined, notbug):
         flymeprint.errorprint('can not cleanAndBuildDir')
         return
 
     state_obj_dict = dict()
-    for entry in listDir:
+    all_entries = get_all_entries(root_path)
+    drop_box_entries = all_entries[0]
+    data_anr_entries = all_entries[1]
+    event_log_entries = all_entries[2]
+    for fullName in drop_box_entries:
         # only system_app_anr is concerned
         # match = re.match('(system_app_anr|data_app_anr).*\.gz', entry)
-        match = re.match('(system_app_anr).*\.gz', entry)
-        if not match:
-            continue
+        # match = re.match('(system_app_anr).*\.gz', entry)
+        # if not match:
+        #    continue
+        entry = os.path.basename(fullName)
         print('start process ---> ' + entry)
-        fullName = os.path.join(dropbox, entry)
         newEntry = entry.rstrip('.gz')
         fullNew = os.path.join(extractall, newEntry)
         wholeFile = extractGzToDest(fullName, fullNew)
         if wholeFile == '':
             continue
 
-        anrobj = parseContent(wholeFile, fullNew, anr, event_log_path_list)
+        anrobj = parseContent(wholeFile, fullNew, data_anr_entries,
+                              event_log_entries)
         if not is_a_valid_anr_obj(anrobj):
             flymeprint.errorprint(entry + ' ---> 信息不完整')
             continue
@@ -80,6 +89,25 @@ def parseDropbox(dropbox, anr, event_log_path_list):
         print('end process ---> ' + entry)
 
     generate_report(state_obj_dict.values(), merge, bug, undetermined, notbug)
+
+
+def get_all_entries(root_path):
+    dropbox_entries = list()
+    data_anr_enties = list()
+    event_log_enties = list()
+    for current_root_dir, current_dir_entries, current_file_entries in os.walk(
+            root_path):
+        for i in current_file_entries:
+            match = re.match('(system_app_anr).*\.gz', i)
+            if match:
+                dropbox_entries.append(os.path.join(current_root_dir, i))
+            match = re.match('traces.*?\.txt', i)
+            if match:
+                data_anr_enties.append(os.path.join(current_root_dir, i))
+            match = re.match('events.*', i)
+            if match:
+                event_log_enties.append(os.path.join(current_root_dir, i))
+    return (dropbox_entries, data_anr_enties, event_log_enties)
 
 
 def append_to_merge_or_match(stateObj, state_obj_dict):
@@ -165,7 +193,7 @@ def cleanAndBuildDir(*dirs):
         for i in dirs:
             if os.path.exists(i):
                 shutil.rmtree(i)
-            os.mkdir(i)
+            os.makedirs(i)
     except Exception as ex:
         flymeprint.errorprint(ex)
         return False
@@ -185,7 +213,7 @@ def extractGzToDest(src, dest):
     return wholeFile
 
 
-def parseContent(content, filename, anrPath, event_log_path_list):
+def parseContent(content, filename, data_anr_entries, event_log_entries):
     # processName = getProcessName(content)
     packageName = getPackageName(content)
     anrReason = getAnrReason(content)
@@ -197,7 +225,7 @@ def parseContent(content, filename, anrPath, event_log_path_list):
     anr_in_time = get_anr_in_time(packageName, content)
     if len(anrTime) == 0:
         flymeprint.errorprint('no dropbox anr time')
-        anrTime = getEventLogAnrTime(event_log_path_list, packageName)
+        anrTime = getEventLogAnrTime(event_log_entries, packageName)
         if (len(anrTime) == 0):
             flymeprint.errorprint('no eventlog anr time')
 
@@ -210,7 +238,7 @@ def parseContent(content, filename, anrPath, event_log_path_list):
         flymeprint.errorprint('no dropbox trace matches')
 
     allMain = getWholeMain(content, packageName, matchedTime, anrTime,
-                           anrPath, anr_in_time)
+                           data_anr_entries, anr_in_time)
     # renderThreadTrace = getRenderThreadTrace(allMain['content'])
     # binderTrace = getBinderTrace(allMain['content'])
 
@@ -237,26 +265,32 @@ def parseContent(content, filename, anrPath, event_log_path_list):
     return anrobj
 
 
-def getEventLogAnrTime(event_log_path_list, packageName):
+event_log_entries_cache = list()
+
+
+def getEventLogAnrTime(event_log_entries, packageName):
     anrTime = dict()
-    for event_log_path in event_log_path_list:
-        try:
-            listDir = os.listdir(event_log_path)
-        except Exception as ex:
-            flymeprint.errorprint(ex)
-            return anrTime
-        for i in listDir:
-            match = re.match('events.*', i)
-            if match:
-                if i.endswith('.gz'):
-                    src = os.path.join(event_log_path, i)
-                    dest = os.path.join(event_log_path, i.rstrip('.gz'))
-                    content = extractGzToDest(src, dest)
-                else:
-                    content = open(os.path.join(event_log_path, i)).read()
-                temp_anr_time = getAnrTime(content, packageName)
-                for i in temp_anr_time.keys():
-                    anrTime[i] = temp_anr_time[i]
+    # for event_log_path in event_log_path_list:
+    #    try:
+    #        listDir = os.listdir(event_log_path)
+    #    except Exception as ex:
+    #        flymeprint.errorprint(ex)
+    #        return anrTime
+    if len(event_log_entries_cache) == 0:
+        for i in event_log_entries:
+            if i.endswith('.gz'):
+                # src = os.path.join(event_log_path, i)
+                src = i
+                dest = i.rstrip('.gz')
+                content = extractGzToDest(src, dest)
+                event_log_entries_cache.append(content)
+            else:
+                content = open(i).read()
+                event_log_entries_cache.append(content)
+    for content in event_log_entries_cache:
+        temp_anr_time = getAnrTime(content, packageName)
+        for i in temp_anr_time.keys():
+            anrTime[i] = temp_anr_time[i]
     return anrTime
 
 
@@ -330,30 +364,35 @@ def getMatchedTime(traceTime, anrTime, anr_in_time):
     return matchedTime
 
 
-def parse_data_anr(packageName, anrTime, anrPath, anr_in_time):
-    anrentries = os.listdir(anrPath)
-    for i in anrentries:
-        match = re.match('traces.*?\.txt', i)
-        if match:
-            wholeAnrPath = os.path.join(anrPath, i)
-            content = open(wholeAnrPath).read()
-            traceTime = getTraceTime(content, packageName)
-            matchedTime = getMatchedTime(traceTime, anrTime, anr_in_time)
-            if len(matchedTime) == 0:
-                continue
-            allMain = getWholeMainFinal(matchedTime, content)
-            allMain['anr_trace_file_name'] = wholeAnrPath
-            return allMain
+data_anr_entries_cache = dict()
+
+
+def parse_data_anr(packageName, anrTime, data_anr_entries, anr_in_time):
+    # anrentries = os.listdir(anrPath)
+    if len(data_anr_entries_cache) == 0:
+        for i in data_anr_entries:
+            entry_content = open(i).read()
+            data_anr_entries_cache[i] = entry_content
+    for file_name in data_anr_entries_cache.keys():
+        traceTime = getTraceTime(data_anr_entries_cache[file_name], packageName)
+        matchedTime = getMatchedTime(traceTime, anrTime, anr_in_time)
+        if len(matchedTime) == 0:
+            continue
+        allMain = getWholeMainFinal(matchedTime,
+                                    data_anr_entries_cache[file_name])
+        allMain['anr_trace_file_name'] = file_name
+        return allMain
     flymeprint.errorprint('no data anr time matches')
     return dict()
 
 
-def getWholeMain(content, packageName, matchedTime, anrTime, anrPath,
+def getWholeMain(content, packageName, matchedTime, data_anr_entries, anrPath,
                  anr_in_time):
-    if len(anrTime) == 0:
+    if len(data_anr_entries) == 0:
         return dict()
     if len(matchedTime) == 0:
-        return parse_data_anr(packageName, anrTime, anrPath, anr_in_time)
+        return parse_data_anr(packageName, data_anr_entries, anrPath,
+                              anr_in_time)
     return getWholeMainFinal(matchedTime, content)
 
 
