@@ -46,8 +46,14 @@ def parseDropbox(root_path):
     state_obj_dict = dict()
     all_entries = get_all_entries(root_path)
     drop_box_entries = all_entries[0]
+    if len(drop_box_entries) == 0:
+        flymeprint.errorprint('no dropbox files found')
     data_anr_entries = all_entries[1]
+    if len(data_anr_entries) == 0:
+        flymeprint.errorprint('no data anr files found')
     event_log_entries = all_entries[2]
+    if len(event_log_entries) == 0:
+        flymeprint.errorprint('no event log files found')
     for fullName in drop_box_entries:
         # only system_app_anr is concerned
         # match = re.match('(system_app_anr|data_app_anr).*\.gz', entry)
@@ -113,7 +119,7 @@ def get_all_entries(root_path):
 def append_to_merge_or_match(stateObj, state_obj_dict):
     key = stateObj.get_key()
     if key in state_obj_dict:
-        print('duplication')
+        print('duplication for:' + key)
         state_obj_dict[key].matched_state_list.append(stateObj)
     else:
         state_obj_dict[key] = stateObj
@@ -224,7 +230,7 @@ def parseContent(content, filename, data_anr_entries, event_log_entries):
     pid = getPid(content, packageName)
     anr_in_time = get_anr_in_time(packageName, content)
     if len(anrTime) == 0:
-        flymeprint.errorprint('no dropbox anr time')
+        flymeprint.errorprint('no dropbox anr time, get eventlog anr time')
         anrTime = getEventLogAnrTime(event_log_entries, packageName)
         if (len(anrTime) == 0):
             flymeprint.errorprint('no eventlog anr time')
@@ -234,7 +240,7 @@ def parseContent(content, filename, data_anr_entries, event_log_entries):
         flymeprint.errorprint('no dropbox trace time')
 
     matchedTime = getMatchedTime(traceTime, anrTime, anr_in_time)
-    if len(matchedTime) == 0:
+    if len(matchedTime) == 0 and len(traceTime) != 0:
         flymeprint.errorprint('no dropbox trace matches')
 
     allMain = getWholeMain(content, packageName, matchedTime, anrTime,
@@ -391,6 +397,7 @@ def getWholeMain(content, packageName, matchedTime, data_anr_entries, anrPath,
     if len(data_anr_entries) == 0:
         return dict()
     if len(matchedTime) == 0:
+        print('parse data anr trace')
         return parse_data_anr(packageName, data_anr_entries, anrPath,
                               anr_in_time)
     return getWholeMainFinal(matchedTime, content)
@@ -448,7 +455,11 @@ def getCpuUsage(content):
         content)
     if not match:
         return "null"
-    return match.group(4)
+    cpu_usage = match.group(4)
+    match = re.search('((.|\n)*?)null\n-----', cpu_usage)
+    if not match:
+        return cpu_usage
+    return match.group(1)
 
 
 def getPid(content, packageName):

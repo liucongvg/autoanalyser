@@ -16,7 +16,7 @@ class Basestate:
 
     def __get_key_inner(self, mainTrace):
         key = mainTrace['thread_state'] + ' '
-        main_trace_list = re.findall('at (.*?)\(.*?\)(\n|\r\n)',
+        main_trace_list = re.findall('  at (.*?)\(.*?\)(\n|\r\n)',
                                      mainTrace['trace'])
         match_count = 0
         for i in main_trace_list:

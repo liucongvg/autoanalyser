@@ -5,7 +5,7 @@ from com.flyme.anranalyser.flymeutils import flymeparser
 #anrPath = '/home/liucong/temp/log/549842/anr'
 #event_log_path_list = ['/home/liucong/temp/log/549842/mtklog/mobilelog/APLog_2017_0607_110615']
 
-root_path = '/home/liucong/temp/log/549842'
+root_path = '/home/liucong/temp/log/558525'
 
 def main():
     start_time = datetime.datetime.now()
