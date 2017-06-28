@@ -87,7 +87,7 @@ class Basestate:
         self.filename = os.path.basename(
             self.anrObj.time_and_filepath['dropbox_file_name'])
         self.merge_filename = os.path.join(merge, self.filename)
-        fd = open(self.merge_filename, 'w')
+        fd = open(self.merge_filename, 'w', encoding='utf-8')
         fd.write(message)
         fd.close()
 

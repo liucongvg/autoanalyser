@@ -209,8 +209,8 @@ def cleanAndBuildDir(*dirs):
 def extractGzToDest(src, dest):
     try:
         gz = gzip.open(src, 'rb')
-        wholeFile = gz.read().decode()
-        newFile = open(dest, 'w')
+        wholeFile = gz.read().decode('utf-8')
+        newFile = open(dest, 'w', encoding='utf-8')
         newFile.write(wholeFile)
         newFile.close()
     except Exception as ex:
@@ -291,7 +291,7 @@ def getEventLogAnrTime(event_log_entries, packageName):
                 content = extractGzToDest(src, dest)
                 event_log_entries_cache.append(content)
             else:
-                content = open(i).read()
+                content = open(i, encoding='utf-8').read()
                 event_log_entries_cache.append(content)
     for content in event_log_entries_cache:
         temp_anr_time = getAnrTime(content, packageName)
@@ -377,7 +377,7 @@ def parse_data_anr(packageName, anrTime, data_anr_entries, anr_in_time):
     # anrentries = os.listdir(anrPath)
     if len(data_anr_entries_cache) == 0:
         for i in data_anr_entries:
-            entry_content = open(i).read()
+            entry_content = open(i, encoding='utf-8').read()
             data_anr_entries_cache[i] = entry_content
     for file_name in data_anr_entries_cache.keys():
         traceTime = getTraceTime(data_anr_entries_cache[file_name], packageName)
@@ -611,7 +611,7 @@ def getMainTrace(allMain):
 
 
 def anrobjtofile(anrObj, fullName):
-    newFile = open(fullName, 'w')
+    newFile = open(fullName, 'w', encoding='utf-8')
     mainConcernedTrace = ''
     for i in anrObj.mainConcernedTrace["__thread_sequece__"]:
         mainConcernedTrace += anrObj.mainConcernedTrace[i]["trace"] + '\n'
