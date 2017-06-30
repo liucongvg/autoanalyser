@@ -8,7 +8,7 @@ class Native(Basestate):
 
     def generate_merge(self, merge):
         trace = self.anrObj.mainTrace['trace']
-        list = re.findall('at (.*?)(\n|\r\n)', trace)
+        list = re.findall('^  at (.*?)(\n|\r\n)', trace, re.M)
         if len(list) == 0 or list[0][
             0].strip() != 'android.view.ThreadedRenderer.nFence(Native method)':
             Basestate.generate_merge(self, merge)

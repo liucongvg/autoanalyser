@@ -9,15 +9,16 @@ class Basestate:
         self.matched_state_list = list()
 
     def get_main_list(self):
-        return re.findall('  at (.*?)(\n|\r\n)', self.anrObj.mainTrace['trace'])
+        return re.findall('^  at (.*?)(\n|\r\n)',
+                          self.anrObj.mainTrace['trace'], re.M)
 
     def get_key(self):
         return self.__get_key_inner(self.anrObj.mainTrace)
 
     def __get_key_inner(self, mainTrace):
         key = mainTrace['thread_state'] + ' '
-        main_trace_list = re.findall('  at (.*?)\(.*?\)(\n|\r\n)',
-                                     mainTrace['trace'])
+        main_trace_list = re.findall('^  at (.*?)\(.*?\)(\n|\r\n)',
+                                     mainTrace['trace'], re.M)
         match_count = 0
         for i in main_trace_list:
             key += (i[0] + ' ')
@@ -62,8 +63,8 @@ class Basestate:
     def __is_main_matched(self, l_state, l_trace, r_state, r_trace):
         if l_state != r_state:
             return False
-        l_list = re.findall('at (.*?)\s', l_trace)
-        r_list = re.findall('at (.*?)\s', r_trace)
+        l_list = re.findall('^  at (.*?)\s', l_trace, re.M)
+        r_list = re.findall('^  at (.*?)\s', r_trace, re.M)
         # if len(l_list) != len(r_list):
         #    return False
         if len(l_list) >= len(r_list):
