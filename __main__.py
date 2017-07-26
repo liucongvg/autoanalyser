@@ -1,5 +1,6 @@
 import datetime
 import sys
+import os
 from com.flyme.autoanalyser.swtanalyser import swtmanager
 from com.flyme.autoanalyser.anranalyser import anrmanager
 
@@ -23,6 +24,13 @@ def main():
             'invalid arguments! two parameter needed!\n--anr root_dir or '
             '--swt root_dir')
         return
+    if os.path.isabs(sys.argv[0]):
+        cdir = os.path.dirname(sys.argv[0])
+        os.chdir(cdir)
+    else:
+        cdir = os.path.dirname(os.path.join(os.getcwd(), sys.argv[0]))
+        os.chdir(cdir)
+    flymeprint.debug('current dir:' + cdir)
     root_path = sys.argv[2]
     if sys.argv[1] == '--anr':
         anrmanager.start(root_path)
