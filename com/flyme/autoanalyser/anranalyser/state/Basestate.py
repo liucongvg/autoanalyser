@@ -150,4 +150,7 @@ class Basestate:
         return 'Main concerned trace:\n' + self.anrObj.mainTrace['trace']
 
     def get_cpuusage(self):
-        return 'Cpu usage:\n' + self.anrObj.cpuUsage
+        usage = self.anrObj.cpuUsage
+        if not usage:
+            usage = 'null'
+        return 'Cpu usage:\n' + usage

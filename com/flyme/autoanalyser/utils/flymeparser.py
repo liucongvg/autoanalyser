@@ -604,17 +604,23 @@ def get_am_anr_list(content):
 
 
 def get_watchdog_list(content):
-    return get_list_final(content, 'I watchdog: ')
+    return get_list_final(content, '(I watchdog: |I/watchdog\( *\d+\): )')
 
 
 def get_list_final(content, keyword):
     match_list = re.findall(
-        '^\d{2}-\d{2} \d{2}:\d{2}:\d{2}.\d{3}.*?' + keyword + '.*', content,
+        '(^\d{2}-\d{2} \d{2}:\d{2}:\d{2}.\d{3}.*?' + keyword + '.*)', content,
         re.M)
     if not match_list:
         return None
     else:
-        return match_list
+        temp_list = list()
+        if isinstance(match_list[0], tuple):
+            for i in match_list:
+                temp_list.append(i[0])
+        else:
+            return match_list
+        return temp_list
 
 
 def get_anr_time_event_log(content, package_name):
@@ -869,7 +875,13 @@ def get_wd_ss_pid(content):  # content is matched watchdog content
         'Blocked|surfaceflinger  hang\.)',
         content, re.M)
     if not match:
-        return None
+        match = re.search(
+            '^\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3}.*? I/watchdog\( *(\d+)\): ',
+            content, re.M)
+        if not match:
+            return None
+        else:
+            return match.group(1)
     else:
         return match.group(1)
 
@@ -906,7 +918,7 @@ def get_trace_time_pid(content, pid, process_name):
         '^----- pid ' + '(' + pid + ')' + ' at (\d{4}-\d{2}-\d{2} \d{2}:\d{'
                                           '2}:\d{2}) '
                                           '-----\nCmd line: ' + process_name
-        # + '\n(.|\n)*?----- end ' + pid + ' -----',
+    #    + '\n(.|\n)*?----- end ' + pid + ' -----'
         , content, re.M)
     if match:
         return match

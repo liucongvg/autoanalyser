@@ -7,10 +7,12 @@ whole_file_cache = dict()
 am_anr_cache = dict()
 event_log_watchdog_cache = dict()
 
+cached_1 = False
 dropbox_files = list()
 data_anr_trace_files = list()
 event_log_files = list()
 
+cached_2 = False
 db_event_log_dict = dict()
 db_trace_dict = dict()
 db_process_and_threads_dict = dict()
@@ -49,25 +51,27 @@ def get_am_anr_cache(file_name):
 
 
 def get_dropbox_files():
-    if len(dropbox_files) == 0:
+    if not cached_1:
         cache_all_file_entries()
     return dropbox_files
 
 
 def get_data_anr_trace_files():
-    if len(data_anr_trace_files) == 0:
+    if not cached_1:
         cache_all_file_entries()
     return data_anr_trace_files
 
 
 def get_event_log_files():
-    if len(event_log_files) == 0:
+    if not cached_1:
         cache_all_file_entries()
     return event_log_files
 
 
 def cache_all_concerned_db_file_entries():
     # clear and extract db
+    global cached_2
+    cached_2 = True
     for current_root_dir, current_dir_entries, current_file_entries in os.walk(
             root_path):
         for dir in current_dir_entries:
@@ -110,7 +114,7 @@ def get_db_event_log_files():
 
 
 def get_db_event_log_dict():
-    if len(db_event_log_dict) == 0:
+    if not cached_2:
         cache_all_concerned_db_file_entries()
     return db_event_log_dict
 
@@ -120,7 +124,7 @@ def get_db_trace_files():
 
 
 def get_db_trace_dict():
-    if len(db_trace_dict) == 0:
+    if not cached_2:
         cache_all_concerned_db_file_entries()
     return db_trace_dict
 
@@ -130,7 +134,7 @@ def get_db_pt_files():
 
 
 def get_db_pt_dict():
-    if len(db_process_and_threads_dict) == 0:
+    if not cached_2:
         cache_all_concerned_db_file_entries()
     return db_process_and_threads_dict
 
@@ -140,12 +144,14 @@ def get_db_bi_files():
 
 
 def get_db_bi_dict():
-    if len(db_binderif_dict) == 0:
+    if not cached_2:
         cache_all_concerned_db_file_entries()
     return db_binderif_dict
 
 
 def cache_all_file_entries():
+    global cached_1
+    cached_1 = True
     for current_root_dir, current_dir_entries, current_file_entries in os.walk(
             root_path):
         for file_name in current_file_entries:

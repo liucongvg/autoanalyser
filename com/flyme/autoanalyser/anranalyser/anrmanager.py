@@ -114,10 +114,13 @@ def parse_dfile(dfile, root_path):
                                             package_name)
     anr_in_time = flymeparser.get_anr_in_time(content, package_name)
     if len(anr_time) == 0:
-        flymeprint.warning('no dropbox anr time, get eventlog anr time')
+        flymeprint.warning(
+            'no dropbox anr time, get eventlog anr time for package:' +
+            package_name)
         anr_time = get_event_log_anr_time(root_path, package_name)
         if len(anr_time) == 0:
-            flymeprint.warning('no eventlog anr time')
+            flymeprint.warning('no eventlog anr time for ' + package_name)
+            return None
 
     trace_time = flymeparser.get_trace_time_for_anr(content, package_name)
     if len(trace_time) == 0:

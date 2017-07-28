@@ -385,8 +385,8 @@ def get_matched_trace_time(watchdog_formated_dict,
                             current_time_interval > later_time_interval):
                     best_later_time_str = system_server_time_str
                     best_later_time_count = system_server_time_count
-                    best_previous_file_name = current_file_name
-                    best_previous_content = current_content
+                    best_later_file_name = current_file_name
+                    best_later_content = current_content
         if no_best_time:
             matched_time[watchdog_time_str][
                 'best_alternative_previous_time_str'] = best_previous_time_str
