@@ -760,20 +760,36 @@ def get_blocked_trace(whole_trace_content, thread_name):
         match = re.search("waiting to lock.*held by thread (\d+)",
                           mainConcernedTrace[lastLocalThreadTid]["trace"])
         if not match:
-            return mainConcernedTrace
-        lockedTid = match.group(1)
-
+            match = re.search('waiting to lock (<\w+?>) ',
+                              mainConcernedTrace[lastLocalThreadTid]['trace'])
+            if not match:
+                return mainConcernedTrace
+            else:
+                lock = match.group(1)
+                match = re.search(
+                    '(^\"(.*?)\" prio=\d+ tid=(\d+) (\w*?)\n(.|\n)*?^  - '
+                    'locked ' +
+                    lock + ' (.|\n)*?)\n{2}',
+                    whole_trace_content, re.M)
+                if not match:
+                    return mainConcernedTrace
+                lockedTid = match.group(3)
+                threadTrace = match.group(1)
+                threadName = match.group(2)
+                threadState = match.group(4)
+        else:
+            lockedTid = match.group(1)
+            match = re.search(
+                "\"(.*)\" prio=.*tid=" + lockedTid + " (\w*)(.|\n)*?(("
+                                                     "\n|\r\n){2}?)",
+                whole_trace_content)
+            if not match:
+                return mainConcernedTrace
+            else:
+                threadTrace = match.group(0).rstrip(match.group(4))
+                threadName = match.group(1)
+                threadState = match.group(2)
         mainConcernedTrace[lastLocalThreadTid]["locked_tid"] = lockedTid
-
-        match = re.search(
-            "\"(.*)\" prio=.*tid=" + lockedTid + " (\w*)(.|\n)*?(("
-                                                 "\n|\r\n){2}?)",
-            whole_trace_content)
-        if not match:
-            return mainConcernedTrace
-        threadTrace = match.group(0).rstrip(match.group(4))
-        threadName = match.group(1)
-        threadState = match.group(2)
         if lockedTid in mainConcernedTrace:
             break
         mainConcernedTrace[lockedTid] = {"trace": threadTrace,
@@ -781,7 +797,6 @@ def get_blocked_trace(whole_trace_content, thread_name):
                                          'thread_name': threadName}
         mainConcernedTrace["__thread_sequece__"].append(lockedTid)
         lastLocalThreadTid = lockedTid
-
     return mainConcernedTrace
 
 
@@ -918,7 +933,7 @@ def get_trace_time_pid(content, pid, process_name):
         '^----- pid ' + '(' + pid + ')' + ' at (\d{4}-\d{2}-\d{2} \d{2}:\d{'
                                           '2}:\d{2}) '
                                           '-----\nCmd line: ' + process_name
-    #    + '\n(.|\n)*?----- end ' + pid + ' -----'
+        #    + '\n(.|\n)*?----- end ' + pid + ' -----'
         , content, re.M)
     if match:
         return match
