@@ -32,11 +32,27 @@ def parse_swt(root_path):
         flymeprint.error('no system_server trace time')
         return
     matched_trace_time = get_matched_trace_time(watchdog_formated_dict,
-                                                system_server_trace_time_dict)
+                                                system_server_trace_time_dict,
+                                                False)
     if not matched_trace_time:
         flymeprint.error('no matched time')
         return
-    swtobj_dict = get_swtobj_dict(watchdog_formated_dict, matched_trace_time)
+    have_pm = False
+    pm_watchdog_formated_dict = dict()
+    for i in watchdog_formated_dict.keys():
+        for j in watchdog_formated_dict[i]['checker_list']:
+            if j['thread_name'] == 'PackageManager':
+                have_pm = True
+                pm_watchdog_formated_dict[i] = watchdog_formated_dict[i]
+    if have_pm:
+        pm_matched_trace_time = get_matched_trace_time(
+            pm_watchdog_formated_dict,
+            system_server_trace_time_dict,
+            True)
+    else:
+        pm_matched_trace_time = None
+    swtobj_dict = get_swtobj_dict(watchdog_formated_dict, matched_trace_time,
+                                  pm_matched_trace_time)
     generate_report(swtobj_dict, root_path)
 
 
@@ -53,11 +69,17 @@ def generate_report(swtobj_dict, root_path):
         swtobj.generate_report(report_dir)
 
 
-def get_swtobj_dict(watchdog_formated_dict, matched_trace_time):
+def get_swtobj_dict(watchdog_formated_dict, matched_trace_time,
+                    pm_matched_trace_time):
     swtobj_dict = dict()
     for time_str in watchdog_formated_dict:
         pid = watchdog_formated_dict[time_str]['pid']
         whole_trace_dict = get_whole_trace_dict(time_str, matched_trace_time)
+        if pm_matched_trace_time:
+            pm_whole_trace_dict = get_whole_trace_dict(time_str,
+                                                       pm_matched_trace_time)
+            pm_whole_previous_trace = pm_whole_trace_dict['previous_trace']
+            pm_whole_later_trace = pm_whole_trace_dict['later_trace']
         if not whole_trace_dict:
             flymeprint.error('empty whole_trace_dict')
             continue
@@ -76,12 +98,21 @@ def get_swtobj_dict(watchdog_formated_dict, matched_trace_time):
             thread_name = checker['thread_name']
             event_log = checker['event_log']
             if checker['checker_type'] == 'handler':
-                handler = Handler(
-                    watchdog_formated_dict[time_str]['time_struct'], pid,
-                    checker_name, thread_name, event_log,
-                    whole_previous_trace,
-                    whole_later_trace)
-                # swtobj_dict[time_str]['handler_list'].append(handler)
+                if (
+                            thread_name == 'PackageManager') and \
+                        pm_matched_trace_time:
+                    handler = Handler(
+                        watchdog_formated_dict[time_str]['time_struct'], pid,
+                        checker_name, thread_name, event_log,
+                        pm_whole_previous_trace,
+                        pm_whole_later_trace)
+                else:
+                    handler = Handler(
+                        watchdog_formated_dict[time_str]['time_struct'], pid,
+                        checker_name, thread_name, event_log,
+                        whole_previous_trace,
+                        whole_later_trace)
+                    # swtobj_dict[time_str]['handler_list'].append(handler)
                 handler_list.append(handler)
             elif checker['checker_type'] == 'monitor':
                 class_name = checker['checker_class_name']
@@ -127,9 +158,18 @@ def get_whole_trace_dict(time_str, matched_trace_time):
                                                           'system_server',
                                                           later_matched_time_str)
     whole_trace_dict['previous_trace'] = {'time': previous_matched_time_str,
-                                          'content': previous_trace_content}
+                                          'content': previous_trace_content,
+                                          'is_valid':
+                                              matched_trace_time[time_str][
+                                                  'is_previous_valid'],
+                                          'i_r': matched_trace_time[time_str][
+                                              'p_i_r']}
     whole_trace_dict['later_trace'] = {'time': later_matched_time_str,
-                                       'content': later_trace_content}
+                                       'content': later_trace_content,
+                                       'is_valid': matched_trace_time[time_str][
+                                           'is_later_valid'],
+                                       'i_r': matched_trace_time[time_str][
+                                           'l_i_r']}
     return whole_trace_dict
 
 
@@ -269,8 +309,15 @@ def get_pid_matched_ss_trace_dict(pid, system_server_trace_time_dict):
 
 
 def get_matched_trace_time(watchdog_formated_dict,
-                           system_server_trace_time_dict):
+                           system_server_trace_time_dict, is_pm):
     flymeprint.debug('getting best-matched time...')
+    if is_pm:
+        middle_t = 300
+        pre_trunc = 600
+    else:
+        middle_t = 30
+        pre_trunc = 120
+    later_trunc = 120
     matched_time = dict()
     if len(system_server_trace_time_dict) < 2:
         flymeprint.error('system_server trace less than 2')
@@ -287,8 +334,8 @@ def get_matched_trace_time(watchdog_formated_dict,
         best_previous_time_str = min(system_server_trace_time_list)
         best_previous_item = ss_pid_matched_trace_dict.pop(
             best_previous_time_str)
-
-        best_previous_time_count = best_previous_item['time_struct'].timestamp()
+        best_previous_time_struct = best_previous_item['time_struct']
+        best_previous_time_count = best_previous_time_struct.timestamp()
         best_previous_file_name = best_previous_item['file_name']
         best_previous_content = best_previous_item['content']
         best_later_time_str = max(system_server_trace_time_list)
@@ -311,7 +358,7 @@ def get_matched_trace_time(watchdog_formated_dict,
         new_time_count = new_time_struct.timestamp()
         if new_time_count > best_previous_time_count:
             no_alternative_time = False
-        if new_time_count - best_previous_time_count >= 30:
+        if new_time_count - best_previous_time_count >= middle_t:
             no_best_previous_time = False
         if new_time_count <= best_later_time_count:
             no_best_later_time = False
@@ -354,7 +401,7 @@ def get_matched_trace_time(watchdog_formated_dict,
                                 previous_time_interval < current_time_interval):
                         change_best_previous = True
                 else:
-                    if (current_time_interval - 30 >= 0) and (
+                    if (current_time_interval - middle_t >= 0) and (
                                 previous_time_interval > current_time_interval):
                         change_best_previous = True
                 if change_best_previous:
@@ -362,6 +409,7 @@ def get_matched_trace_time(watchdog_formated_dict,
                     best_previous_time_count = system_server_time_count
                     best_previous_file_name = current_file_name
                     best_previous_content = current_content
+                    best_previous_time_struct = system_server_trace_time_struct
                 if no_best_later_time:
                     if current_time_interval < later_time_interval:
                         change_best_later = True
@@ -374,34 +422,74 @@ def get_matched_trace_time(watchdog_formated_dict,
                     best_later_time_count = system_server_time_count
                     best_later_file_name = current_file_name
                     best_later_content = current_content
+                    best_later_time_struct = system_server_trace_time_struct
             else:
-                if (current_time_interval - 30 >= 0) and (
+                if (current_time_interval - middle_t >= 0) and (
                             current_time_interval < previous_time_interval):
                     best_previous_time_str = system_server_time_str
                     best_previous_time_count = system_server_time_count
                     best_previous_file_name = current_file_name
                     best_previous_content = current_content
+                    best_previous_time_struct = system_server_trace_time_struct
                 if (current_time_interval <= 0) and (
                             current_time_interval > later_time_interval):
                     best_later_time_str = system_server_time_str
                     best_later_time_count = system_server_time_count
                     best_later_file_name = current_file_name
                     best_later_content = current_content
+                    best_later_time_struct = system_server_trace_time_struct
         if no_best_time:
             matched_time[watchdog_time_str][
                 'best_alternative_previous_time_str'] = best_previous_time_str
             matched_time[watchdog_time_str][
                 'best_alternative_later_time_str'] = best_later_time_str
+            matched_time[watchdog_time_str][
+                'best_alternative_previous_time_struct'] = \
+                best_previous_time_struct
+            matched_time[watchdog_time_str][
+                'best_alternative_later_time_struct'] = \
+                best_later_time_struct
         else:
             matched_time[watchdog_time_str][
                 'best_previous_time_str'] = best_previous_time_str
             matched_time[watchdog_time_str][
                 'best_later_time_str'] = best_later_time_str
+            matched_time[watchdog_time_str][
+                'best_previous_time_struct'] = best_previous_time_struct
+            matched_time[watchdog_time_str][
+                'best_later_time_struct'] = best_later_time_struct
+        current_prev_trunc = watchdog_time_struct.timestamp() - \
+                             best_previous_time_struct.timestamp()
+        current_later_trunc = best_later_time_struct.timestamp() - \
+                              watchdog_time_struct.timestamp()
+        is_previous_valid = True
+        is_later_valid = True
+        p_ivalid_reason = None
+        l_ivalid_reason = None
+        if current_prev_trunc > pre_trunc:
+            p_ivalid_reason = 'trace is ' + str(current_prev_trunc) + 's long to ' \
+                                                                 'watchdog ' \
+                                                                 'time,' \
+                                                                 'no need to ' \
+                                                                 'print'
+            is_previous_valid = False
+        if current_later_trunc > later_trunc:
+            is_later_valid = False
+            l_ivalid_reason = 'trace is ' + str(current_later_trunc) + 's long ' \
+                                                                  'after ' \
+                                                                  'watchdog ' \
+                                                                  'time,' \
+                                                                  'no need ' \
+                                                                  'to print'
         matched_time[watchdog_time_str][
             'previous_file_name'] = best_previous_file_name
         matched_time[watchdog_time_str][
             'previous_content'] = best_previous_content
+        matched_time[watchdog_time_str]['is_previous_valid'] = is_previous_valid
         matched_time[watchdog_time_str][
             'later_file_name'] = best_later_file_name
         matched_time[watchdog_time_str]['later_content'] = best_later_content
+        matched_time[watchdog_time_str]['is_later_valid'] = is_later_valid
+        matched_time[watchdog_time_str]['p_i_r'] = p_ivalid_reason
+        matched_time[watchdog_time_str]['l_i_r'] = l_ivalid_reason
     return matched_time

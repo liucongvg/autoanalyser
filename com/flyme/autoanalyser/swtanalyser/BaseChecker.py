@@ -18,11 +18,17 @@ class BaseChecker:
     def generate_report(self, fd):
         fd.write(self.event_log + '\n')
         fd.write('previous ---> time: ' + self.previous_trace['time'] + '\n')
-        self.__generate_report_final(fd, self.previous_trace['content'],
-                                     self.thread_name, False)
+        if self.previous_trace['is_valid']:
+            self.__generate_report_final(fd, self.previous_trace['content'],
+                                         self.thread_name, False)
+        else:
+            fd.write(self.previous_trace['i_r'] + '\n')
         fd.write('later ---> time: ' + self.later_trace['time'] + '\n')
-        self.__generate_report_final(fd, self.later_trace['content'],
-                                     self.thread_name, True)
+        if self.later_trace['is_valid']:
+            self.__generate_report_final(fd, self.later_trace['content'],
+                                         self.thread_name, True)
+        else:
+            fd.write(self.later_trace['i_r'] + '\n')
 
     def __generate_report_final(self, fd, whole_trace, thread_name, is_later):
         if not whole_trace:
