@@ -235,6 +235,25 @@ def extractGz(src, dest=None):
     return wholeFile
 
 
+def get_content_for_mlogt(file_name):
+    if file_name.endswith('.gz'):
+        fd = gzip.open(file_name, 'rb')
+    else:
+        fd = open(file_name, mode='rb')
+    pre = fd.read(1024).decode('utf-8')
+    fd.seek(-1024, os.SEEK_END)
+    later = fd.read().decode('utf-8')
+    fd.close()
+    return pre + later
+
+
+def get_mainlog_time_list(content):
+    match = re.findall('(^\d{2}-\d{2} \d{2}:\d{2}:\d{2}.\d{3})', content, re.M)
+    if not match:
+        return None
+    return match
+
+
 # def parseContent(content, filename, data_anr_entries, event_log_entries):
 #    # processName = getProcessName(content)
 #    packageName = get_pname_dropbox(content)
@@ -329,7 +348,7 @@ def extractGz(src, dest=None):
 
 def get_trace_pid(content, trace_time, package_name):
     match = re.search(
-        '^----- pid (\d+) at \d{4}-\d{2}-\d{2} ' + trace_time + ' -----(\n)Cmd '
+        '^----- pid (\d+) at ' + trace_time + ' -----(\n)Cmd '
                                                                 'line: ' +
         package_name,
         content, re.M)
@@ -521,7 +540,7 @@ def get_whole_trace_final(matched_time, content):
     if 'trace_time' not in matched_time or 'anr_time' not in matched_time:
         return dict()
     match = re.search(
-        '^----- pid ' + '\d+' + ' at \d{4}-\d{2}-\d{2} ' + matched_time[
+        '^----- pid ' + '\d+' + ' at ' + matched_time[
             'trace_time'] + ' -----' + "((.|\n)*?)" + "----- end " + '\d+' +
         " -----",
         content, re.M)
@@ -568,7 +587,7 @@ def get_cpu_dropbox(content):
     #    "(\n|\r\n){2}((.|\n)*?(CPU usage from(.|\n)*?)(\r\n|\n){2}?)",
     #    content)
     match = re.search(
-        '(^CPU usage from .*?ms to .*?ms ago:(.|\n)*?)(\n{2}|\nnull\n----- '
+        '(^CPU usage from .*?ms to .*?ms ago(.|\n)*?)(\n{2}|\nnull\n----- '
         'pid )',
         content, re.M)
     if not match:
@@ -625,11 +644,11 @@ def get_list_final(content, keyword):
 
 def get_anr_time_event_log(content, package_name):
     match = re.findall(
-        '^\d{2}-\d{2} (\d{2}:\d{2}:\d{2}.\d{3}).*?am_anr.*?' + package_name,
+        '^(\d{2}-\d{2} \d{2}:\d{2}:\d{2}.\d{3}).*?am_anr.*?' + package_name,
         content, re.M)
     anrTime = dict()
     for i in match:
-        match = re.search('^(\d{2}):(\d{2}):(\d{2}).(\d{3})', i, re.M)
+        match = re.search('(\d{2}):(\d{2}):(\d{2}).(\d{3})', i, re.M)
         hour = match.group(1)
         minute = match.group(2)
         second = match.group(3)
@@ -646,7 +665,7 @@ def get_anr_time_event_log(content, package_name):
 def get_anr_in_time(content, packageName):
     anr_in_time = dict()
     match = re.search(
-        '^\d{2}-\d{2} ((\d{2}):(\d{2}):(\d{2}).(\d{3})).*ANR in ' + packageName,
+        '^(\d{2}-\d{2} (\d{2}):(\d{2}):(\d{2}).(\d{3})).*ANR in ' + packageName,
         content, re.M)
     if not match:
         return anr_in_time
@@ -667,7 +686,7 @@ def get_anr_in_time(content, packageName):
 def get_trace_time_for_anr(content, package_name):
     traceTime = dict()  # key is string time, value is integer time
     match = re.findall(
-        '^----- pid ' + '\d+' + ' at \d*-\d*-\d* (\d{2}:\d{2}:\d{2}) '
+        '^----- pid ' + '\d+' + ' at (\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) '
                                 '-----\nCmd line: ' + package_name,
         content, re.M)
     for i in match:

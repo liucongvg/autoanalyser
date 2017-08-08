@@ -2,6 +2,9 @@ import re
 import os
 import shutil
 
+from com.flyme.autoanalyser.cache import cachemanager
+from com.flyme.autoanalyser.utils import flymeprint
+
 
 class Basestate:
     def __init__(self, anrObj):
@@ -154,3 +157,19 @@ class Basestate:
         if not usage:
             usage = 'null'
         return 'Cpu usage:\n' + usage
+
+    def is_main_log_time_valid(self):
+        time_list = cachemanager.get_all_main_log_time_cache()
+        if not time_list:
+            flymeprint.warning('time_tuple null')
+            return False
+        matched = False
+        for i in time_list:
+            if (self.anrObj.time_and_filepath['anr_time'] < i[1]) and (
+                        self.anrObj.time_and_filepath['anr_time'] > i[0]):
+                matched = True
+        if matched:
+            return True
+        else:
+            flymeprint.warning('未抓到anr对应时间点的main log，不提bug...')
+        return False

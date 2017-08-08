@@ -293,4 +293,7 @@ def generate_report(state_obj_list, merge, bug, undetermined, notbug):
         return
     for i in state_obj_list:
         i.generate_merge(merge)
+        if not i.is_main_log_time_valid():
+            i.generate_notbug(notbug)
+            continue
         i.generate_bug_and_undetermined_if_needed(bug, undetermined, notbug)

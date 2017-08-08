@@ -6,11 +6,14 @@ root_path = None
 whole_file_cache = dict()
 am_anr_cache = dict()
 event_log_watchdog_cache = dict()
+main_log_time_cache = dict()
+all_main_log_time_cache = list()
 
 cached_1 = False
 dropbox_files = list()
 data_anr_trace_files = list()
 event_log_files = list()
+main_log_files = list()
 
 cached_2 = False
 db_event_log_dict = dict()
@@ -50,6 +53,31 @@ def get_am_anr_cache(file_name):
     return content
 
 
+def get_main_log_time_cache(file_name):
+    if file_name not in main_log_time_cache:
+        content = flymeparser.get_content_for_mlogt(file_name)
+        time_list = flymeparser.get_mainlog_time_list(content)
+        if (not time_list) or (len(time_list) < 2):
+            entry = None
+            flymeprint.warning(file_name + ' have no main log time')
+        else:
+            entry = (time_list[0], time_list[-1])
+        main_log_time_cache[file_name] = entry
+    return main_log_time_cache[file_name]
+
+
+def get_all_main_log_time_cache():
+    if all_main_log_time_cache:
+        return all_main_log_time_cache
+    for file_name in get_main_log_files():
+        cache_entry = get_main_log_time_cache(file_name)
+        if cache_entry:
+            all_main_log_time_cache.append(cache_entry)
+    if not all_main_log_time_cache:
+        return None
+    return all_main_log_time_cache
+
+
 def get_dropbox_files():
     if not cached_1:
         cache_all_file_entries()
@@ -66,6 +94,12 @@ def get_event_log_files():
     if not cached_1:
         cache_all_file_entries()
     return event_log_files
+
+
+def get_main_log_files():
+    if not cached_1:
+        cache_all_file_entries()
+    return main_log_files
 
 
 def cache_all_concerned_db_file_entries():
@@ -166,3 +200,5 @@ def cache_all_file_entries():
             if flymeparser.is_fname_match(file_name, 'events.*'):
                 event_log_files.append(
                     os.path.join(current_root_dir, file_name))
+            if flymeparser.is_fname_match(file_name, 'main.*'):
+                main_log_files.append(os.path.join(current_root_dir, file_name))
