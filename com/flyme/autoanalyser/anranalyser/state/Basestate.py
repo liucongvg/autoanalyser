@@ -145,9 +145,10 @@ class Basestate:
         ) + '\n\n' \
                + \
                self.__get_repeat_time() + '\n\n' + \
-               self.__get_event_log_anr_time() + \
+               self.__get_anr_in_time() + \
                '\n\n' \
-               + self.__get_trace_time() + '\n\n' + self.__get_anr_in_time()
+               + self.__get_event_log_anr_time() + '\n\n' + \
+               self.__get_trace_time()
 
     def get_main_trace(self):
         return 'Main concerned trace:\n' + self.anrObj.mainTrace['trace']
