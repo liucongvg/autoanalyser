@@ -12,7 +12,7 @@ class SwtObj:
         self.monitor_list = monitor_list
 
     def generate_report(self, dir):
-        file = os.path.join(dir, self.time + '_swt.txt')
+        file = os.path.join(dir, self.time.replace(':', '_') + '_swt.txt')
         flymeparser.clean_files(file)
         fd = open(file, 'a', encoding='utf-8')
         fd.write(self.event_log + '\n\n')
