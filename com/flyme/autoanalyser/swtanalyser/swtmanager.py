@@ -127,6 +127,7 @@ def get_swtobj_dict(watchdog_formated_dict, matched_trace_time,
                 continue
         swtobj = SwtObj(pid, time_str,
                         watchdog_formated_dict[time_str]['event_log'],
+                        watchdog_formated_dict[time_str]['file_name'],
                         handler_list, monitor_list)
         swtobj_dict[time_str] = swtobj
     return swtobj_dict
@@ -163,13 +164,17 @@ def get_whole_trace_dict(time_str, matched_trace_time):
                                               matched_trace_time[time_str][
                                                   'is_previous_valid'],
                                           'i_r': matched_trace_time[time_str][
-                                              'p_i_r']}
+                                              'p_i_r'], 'file_name':
+                                              matched_trace_time[time_str][
+                                                  'previous_file_name']}
     whole_trace_dict['later_trace'] = {'time': later_matched_time_str,
                                        'content': later_trace_content,
                                        'is_valid': matched_trace_time[time_str][
                                            'is_later_valid'],
                                        'i_r': matched_trace_time[time_str][
-                                           'l_i_r']}
+                                           'l_i_r'],
+                                       'file_name': matched_trace_time[
+                                           time_str]['later_file_name']}
     return whole_trace_dict
 
 
@@ -467,20 +472,24 @@ def get_matched_trace_time(watchdog_formated_dict,
         p_ivalid_reason = None
         l_ivalid_reason = None
         if current_prev_trunc > pre_trunc:
-            p_ivalid_reason = 'trace is ' + str(current_prev_trunc) + 's long to ' \
-                                                                 'watchdog ' \
-                                                                 'time,' \
-                                                                 'no need to ' \
-                                                                 'print'
+            p_ivalid_reason = 'trace is ' + str(
+                int(current_prev_trunc)) + 's long to ' \
+                                           'watchdog ' \
+                                           'time,' \
+                                           'no need to ' \
+                                           'print'
             is_previous_valid = False
         if current_later_trunc > later_trunc:
             is_later_valid = False
-            l_ivalid_reason = 'trace is ' + str(current_later_trunc) + 's long ' \
-                                                                  'after ' \
-                                                                  'watchdog ' \
-                                                                  'time,' \
-                                                                  'no need ' \
-                                                                  'to print'
+            l_ivalid_reason = 'trace is ' + str(
+                int(current_later_trunc)) + 's long ' \
+                                            'after ' \
+                                            '' \
+                                            '' \
+                                            'watchdog ' \
+                                            'time,' \
+                                            'no need ' \
+                                            'to print'
         matched_time[watchdog_time_str][
             'previous_file_name'] = best_previous_file_name
         matched_time[watchdog_time_str][
