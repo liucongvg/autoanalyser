@@ -19,7 +19,7 @@ class Basestate:
         return self.__get_key_inner(self.anrObj.mainTrace)
 
     def __get_key_inner(self, mainTrace):
-        key = mainTrace['thread_state'] + ' '
+        key = self.anrObj.packageName + ' ' + mainTrace['thread_state'] + ' '
         main_trace_list = re.findall('^  at (.*?)\(.*?\)(\n|\r\n)',
                                      mainTrace['trace'], re.M)
         match_count = 0
