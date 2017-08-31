@@ -1,6 +1,8 @@
 import datetime
 import sys
 import os
+
+from com.flyme.autoanalyser.oucanalyser import oucmanager
 from com.flyme.autoanalyser.swtanalyser import swtmanager
 from com.flyme.autoanalyser.anranalyser import anrmanager
 
@@ -19,10 +21,11 @@ from com.flyme.autoanalyser.utils import flymeprint
 
 def main():
     start_time = datetime.datetime.now()
-    if len(sys.argv) != 3:
+    if (len(sys.argv) != 3) and (len(sys.argv) != 4):
         flymeprint.error(
-            'invalid arguments! two parameter needed!\n--anr root_dir or '
-            '--swt root_dir')
+            'invalid arguments! two or three parameter needed!\n--anr '
+            'root_dir or '
+            '--swt root_dir or --ouc_excel excel_filename [dest_path]')
         return
     if os.path.isabs(sys.argv[0]):
         cdir = os.path.dirname(sys.argv[0])
@@ -36,8 +39,14 @@ def main():
         anrmanager.start(root_path)
     elif sys.argv[1] == '--swt':
         swtmanager.start(root_path)
+    elif sys.argv[1] == '--ouc_excel':
+        if len(sys.argv) == 4:
+            dest_dir = sys.argv[3]
+        else:
+            dest_dir = None
+        oucmanager.start(sys.argv[2], dest_dir)
     else:
-        flymeprint.error('use --anr or --swt')
+        flymeprint.error('use --anr or --swt or --ouc_excel')
         return
     end_time = datetime.datetime.now()
     flymeprint.debug(

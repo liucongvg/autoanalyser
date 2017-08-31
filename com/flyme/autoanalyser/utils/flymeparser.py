@@ -1,8 +1,10 @@
 import gzip
+import hashlib
 import os
 import re
 import shutil
 import subprocess
+import zipfile
 from datetime import datetime
 import sys
 
@@ -21,6 +23,13 @@ import sys
 # from com.flyme.autoanalyser.anranalyser.state.WaitingPerformingGc import \
 #    WaitingPerformingGc
 from com.flyme.autoanalyser.utils import flymeprint
+
+try:
+    import pandas
+    import requests
+    import pymysql
+except Exception as ex:
+    flymeprint.error(ex)
 
 
 # def parseDropbox(root_path):
@@ -349,7 +358,7 @@ def get_mainlog_time_list(content):
 def get_trace_pid(content, trace_time, package_name):
     match = re.search(
         '^----- pid (\d+) at ' + trace_time + ' -----(\n)Cmd '
-                                                                'line: ' +
+                                              'line: ' +
         package_name,
         content, re.M)
     if match:
@@ -1071,3 +1080,140 @@ def get_whole_trace_str_pid_process_time(content, pid, time, process):
     if not match:
         return None
     return match.group(1)
+
+
+def download_log(uri, ouc_dest_dir):
+    try:
+        os.makedirs(ouc_dest_dir, exist_ok=True)
+        zip_name = uri.rsplit('/', 1)[1]
+        zip_whole_name = os.path.join(ouc_dest_dir, zip_name)
+        # uri = uri.replace('dfs.meizu.com', 'm.dfs.meizu.com')
+        r = requests.get(uri)
+        fd = open(zip_whole_name, 'wb')
+        fd.write(r.content)
+        md5sum = hashlib.md5(r.content).hexdigest()
+        fd.close()
+    except Exception as ex:
+        flymeprint.error(ex)
+        return None
+    return (zip_whole_name, md5sum)
+
+
+# def insert_to_database(cursor, table_name, raw, db_dir, zip_md5, db_md5):
+def insert_to_database(cursor, table_name, raw, additional_dict):
+    insert_str_list = list()
+    values = list()
+    insert_str_list.append('insert into ' + table_name + '(')
+    for key in raw.keys().tolist():
+        insert_str_list.append(key)
+        insert_str_list.append(',')
+        values.append('\'' + str(raw[key]) + '\'')
+        values.append(',')
+    for key in additional_dict.keys():
+        insert_str_list.append(key)
+        insert_str_list.append(',')
+        values.append('\'' + additional_dict[key] + '\'')
+        values.append(',')
+    insert_str_list.pop()
+    values.pop()
+    values_str = ''.join(values)
+    insert_str_list.append(') values(')
+    insert_str_list.append(values_str)
+    insert_str_list.append(')')
+    final_insert_str = ''.join(insert_str_list)
+    flymeprint.debug('excuting insert sql:' + final_insert_str)
+    cursor.execute(final_insert_str)
+
+
+def get_brief_trace(whole_trace, is_je):
+    if is_je:
+        main_trace_list = re.findall('^\tat (.*?)\(.*?\)(\n|\r\n)?',
+                                     whole_trace, re.M)
+    else:
+        main_trace_list = re.findall('^  at (.*?)\(.*?\)(\n|\r\n)', whole_trace,
+                                     re.M)
+    match_count = 0
+    brief_trace = ''
+    for i in main_trace_list:
+        brief_trace += i[0]
+        match_count += 1
+        if match_count >= 3 or match_count == len(main_trace_list):
+            break
+        else:
+            brief_trace += '_'
+    return brief_trace
+
+
+def get_exclass(content):
+    match = re.search('^Exception Class: (.*)\n', content, re.M)
+    if not match:
+        return ''
+    else:
+        return match.group(1)
+
+
+def get_sj(content):
+    match = re.search('^Subject: (.*)', content, re.M)
+    if not match:
+        return ''
+    else:
+        return match.group(1)
+
+
+def get_exlt(content):
+    match = re.search('^Exception Log Time:(.*)\n', content, re.M)
+    if not match:
+        return ''
+    else:
+        return match.group(1)
+
+
+def get_je_trace(content):
+    match = re.search('^Build:.*\n\n((.|\n)*?)\n\n', content, re.M)
+    if not match:
+        return ''
+    else:
+        return match.group(1)
+
+
+def get_ne_trace(content):
+    match = re.search('^Backtrace: \n((.|\n)*?)\n\n', content, re.M)
+    if not match:
+        return ''
+    else:
+        return match.group(1)
+
+
+def get_brief_ne_trace(whole_trace):
+    match = re.findall('^    #\d+ pc \w+  .*? \((.*?)\)', whole_trace, re.M)
+    match_count = 0
+    brief_trace = ''
+    for i in match:
+        brief_trace += i
+        match_count += 1
+        if match_count >= 3 or match_count == len(match):
+            break
+        else:
+            brief_trace += '_'
+    return brief_trace
+
+
+def get_swt_report_trace(whole_trace, thread_name):
+    if not whole_trace:
+        flymeprint.error('trace content empty')
+        return None
+    thread_state = get_thread_state(whole_trace, thread_name)
+    if not thread_state:
+        flymeprint.error('error in generate_report for ' + thread_name)
+        return None
+    if thread_state == 'Blocked':
+        trace_dict = get_blocked_trace(whole_trace,
+                                       thread_name)
+        trace = str()
+        for i in trace_dict['__thread_sequece__']:
+            last_trace = trace_dict[i]['trace']
+            trace += (last_trace + '\n')
+    else:
+        trace_dict = get_trace(whole_trace, thread_name)
+        trace = trace_dict['trace']
+    return trace

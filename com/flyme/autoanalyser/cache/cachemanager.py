@@ -108,14 +108,18 @@ def cache_all_concerned_db_file_entries():
     cached_2 = True
     for current_root_dir, current_dir_entries, current_file_entries in os.walk(
             root_path):
+        dec_dir = None
         for dir in current_dir_entries:
             if flymeparser.is_fname_match(dir,
                                           'db\.fatal\.\d{2}\.SWT\.dbg\.DEC'):
-                flymeparser.clean_files(os.path.join(current_root_dir, dir))
+                # flymeparser.clean_files(os.path.join(current_root_dir, dir))
+                dec_dir = dir
         for file in current_file_entries:
             if flymeparser.is_fname_match(file, 'db\.fatal\.\d{2}\.SWT\.dbg'):
                 try:
-                    flymeparser.extract_db(os.path.join(current_root_dir, file))
+                    if (not dec_dir) or (dec_dir != file + '.DEC'):
+                        flymeparser.extract_db(
+                            os.path.join(current_root_dir, file))
                 except Exception as ex:
                     flymeprint.error(ex)
     # cache
@@ -202,3 +206,36 @@ def cache_all_file_entries():
                     os.path.join(current_root_dir, file_name))
             if flymeparser.is_fname_match(file_name, 'main.*'):
                 main_log_files.append(os.path.join(current_root_dir, file_name))
+
+
+def free_cache():
+    global whole_file_cache
+    whole_file_cache = dict()
+    global am_anr_cache
+    am_anr_cache = dict()
+    global event_log_watchdog_cache
+    event_log_watchdog_cache = dict()
+    global main_log_time_cache
+    main_log_time_cache=dict()
+    global all_main_log_time_cache
+    all_main_log_time_cache = list()
+    global cached_1
+    cached_1=False
+    global dropbox_files
+    dropbox_files = list()
+    global data_anr_trace_files
+    data_anr_trace_files = list()
+    global event_log_files
+    event_log_files = list()
+    global main_log_files
+    main_log_files = list()
+    global cached_2
+    cached_2 = False
+    global db_event_log_dict
+    db_event_log_dict = dict()
+    global db_trace_dict
+    db_trace_dict = dict()
+    global db_process_and_threads_dict
+    db_process_and_threads_dict = dict()
+    global db_binderif_dict
+    db_binderif_dict = dict()

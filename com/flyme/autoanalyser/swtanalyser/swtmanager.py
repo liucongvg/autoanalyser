@@ -34,9 +34,18 @@ def parse_swt(root_path):
     matched_trace_time = get_matched_trace_time(watchdog_formated_dict,
                                                 system_server_trace_time_dict,
                                                 False)
-    if not matched_trace_time:
+    if (not matched_trace_time) or (len(matched_trace_time) <= 1):
         flymeprint.error('no matched time')
         return
+    pm_matched_trace_time = get_pm_matched_trace_time(
+        system_server_trace_time_dict, watchdog_formated_dict)
+    swtobj_dict = get_swtobj_dict(watchdog_formated_dict, matched_trace_time,
+                                  pm_matched_trace_time)
+    generate_report(swtobj_dict, root_path)
+
+
+def get_pm_matched_trace_time(system_server_trace_time_dict,
+                              watchdog_formated_dict):
     have_pm = False
     pm_watchdog_formated_dict = dict()
     for i in watchdog_formated_dict.keys():
@@ -51,12 +60,11 @@ def parse_swt(root_path):
             True)
     else:
         pm_matched_trace_time = None
-    swtobj_dict = get_swtobj_dict(watchdog_formated_dict, matched_trace_time,
-                                  pm_matched_trace_time)
-    generate_report(swtobj_dict, root_path)
+    return pm_matched_trace_time
 
 
 def parse_db_watchdog(root_path):
+    cachemanager.root_path = root_path
     db_event_log_files = cachemanager.get_db_event_log_files()
     return parse_event_log_for_wd_by_entries(db_event_log_files)
 
@@ -343,6 +351,8 @@ def get_matched_trace_time(watchdog_formated_dict,
         best_previous_time_count = best_previous_time_struct.timestamp()
         best_previous_file_name = best_previous_item['file_name']
         best_previous_content = best_previous_item['content']
+        if not system_server_trace_time_list:
+            return matched_time
         best_later_time_str = max(system_server_trace_time_list)
         best_later_item = ss_pid_matched_trace_dict.pop(best_later_time_str)
         max_time_struct = best_later_time_struct = best_later_item[
