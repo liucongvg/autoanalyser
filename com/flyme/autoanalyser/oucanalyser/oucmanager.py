@@ -45,7 +45,7 @@ def parse_excel(excel_fn, ouc_dest_dir):
             'index index_brief_trace(brief_trace),whole_trace varchar(8192),'
             'exception_log_time varchar(100))')
         db.commit()
-        df = pandas.read_excel(excel_fn)
+        df = pandas.read_excel(excel_fn, sheetname=0)
         try:
             loop_count = 0
             it = df.iterrows()
