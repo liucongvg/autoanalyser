@@ -1,8 +1,11 @@
 import hashlib
 import os
 import zipfile
+import traceback
+import sys
 
 from com.flyme.autoanalyser.cache import cachemanager
+from com.flyme.autoanalyser.exceptionanalyser import jemanager, nemanager
 from com.flyme.autoanalyser.swtanalyser import swtmanager
 from com.flyme.autoanalyser.utils import flymeparser, flymeprint
 import datetime
@@ -12,7 +15,7 @@ try:
     import requests
     import pymysql
 except Exception as ex:
-    flymeprint.error(ex)
+    traceback.print_exc(file=sys.stdout)
 
 
 def start(excel_fn, dest_dir=None):
@@ -26,24 +29,11 @@ def parse_excel(excel_fn, ouc_dest_dir):
     try:
         db = pymysql.connect(host='localhost', user='flyme_stability',
                              password='123456', db='flyme_stability_1')
-        table_name = 'pro7_urge_1'
+        table_name = 'pro7_urge_2'
         cursor = db.cursor()
-        cursor.execute(
-            'create table if not exists pro7_urge_1(download_uri varchar(256) '
-            'not null,zip_md5 varchar(40) not null,db_md5 varchar(40) not '
-            'null,primary key(db_md5),db_dir varchar(1024),fdevice varchar('
-            '30),fpackage_name '
-            'varchar(50),fflyme_ver varchar(80),'
-            'index index_fpackage_name('
-            'fpackage_name),fimei varchar(50),index index_fimei(fimei),'
-            'fos_version varchar(10),'
-            'froot varchar(10),fcountry varchar(10),fnetwork varchar(10),'
-            'fcrashtime varchar(40),fupload_time varchar(40),inside_id '
-            'varchar(40),stat_date varchar(20), exception_class varchar(20), '
-            'index index_exception_class(exception_class),subject varchar('
-            '512),index index_subject(subject),brief_trace varchar(512),'
-            'index index_brief_trace(brief_trace),whole_trace varchar(8192),'
-            'exception_log_time varchar(100))')
+        create_table_sql = 'create table if not exists ' + table_name + '(download_uri varchar(256) not null,zip_md5 varchar(40) not null,db_md5 varchar(40) not null,primary key(db_md5),db_dir varchar(1024),fdevice varchar(30),fpackage_name varchar(50),fflyme_ver varchar(80),index index_fpackage_name(fpackage_name),fimei varchar(50),index index_fimei(fimei),fos_version varchar(10),froot varchar(10),fcountry varchar(10),fnetwork varchar(10),fcrashtime varchar(40),fupload_time varchar(40),inside_id varchar(40),stat_date varchar(20), exception_class varchar(20), index index_exception_class(exception_class),subject varchar(512),index index_subject(subject),brief_trace varchar(512),index index_brief_trace(brief_trace),exception_log_time varchar(100))'
+        flymeprint.debug('excuting create table sql:\n' + create_table_sql)
+        cursor.execute(create_table_sql)
         db.commit()
         df = pandas.read_excel(excel_fn, sheetname=0)
         try:
@@ -60,17 +50,18 @@ def parse_excel(excel_fn, ouc_dest_dir):
                     extract_log_to_db(cursor, table_name, row, zip_file, md5sum)
                     db.commit()
                 except Exception as ex:
-                    flymeprint.warning(ex)
+                    traceback.print_exc(file=sys.stdout)
                 finally:
                     cachemanager.free_cache()
                     # loop_count += 1
                     # if loop_count == 10:
                     #    break
         except StopIteration as stop_ex:
+            traceback.print_exc(file=sys.stdout)
             flymeprint.debug('parse excel done')
             # ouc_dest_dir = '/home/liucong/temp/ouc/1503385916.620414'
     except Exception as ex:
-        flymeprint.error(ex)
+        traceback.print_exc(file=sys.stdout)
     finally:
         if not db:
             db.close()
@@ -98,7 +89,6 @@ def extract_log_to_db(cursor, table_name, row, zip_file, zip_md5sum):
                 fd = open(to_extract, mode='rb')
                 db_md5_sum = hashlib.md5(fd.read()).hexdigest()
                 db_dir = os.path.join(root, entry + '.DEC')
-                whole_trace = ''
                 brief_trace = ''
                 fd = open(os.path.join(db_dir, '__exp_main.txt'),
                           encoding='utf-8')
@@ -108,131 +98,29 @@ def extract_log_to_db(cursor, table_name, row, zip_file, zip_md5sum):
                 exception_log_time = flymeparser.get_exlt(exp_main_content)
                 if exception_class == 'SWT':
                     flymeprint.debug('exception class:SWT')
-                    watchdog_raw_dict = swtmanager.parse_db_watchdog(root)
-                    is_valid_swt = False
-                    is_valid_trace = False
-                    is_trace_matched = False
-                    if watchdog_raw_dict:
-                        is_valid_swt = True
-                        watchdog_formated_dict = \
-                            swtmanager.parse_watchdog_raw_dict(
-                                watchdog_raw_dict)
-                        system_server_trace_time_dict = \
-                            swtmanager.parse_db_trace(
-                                root)
-                        if system_server_trace_time_dict:
-                            is_valid_trace = True
-                            matched_trace_time = \
-                                swtmanager.get_matched_trace_time(
-                                    watchdog_formated_dict,
-                                    system_server_trace_time_dict,
-                                    False)
-                            if matched_trace_time:
-                                is_trace_matched = True
-                                pm_matched_trace_time = \
-                                    swtmanager.get_pm_matched_trace_time(
-                                        system_server_trace_time_dict,
-                                        watchdog_formated_dict)
-                                swtobj_dict = swtmanager.get_swtobj_dict(
-                                    watchdog_formated_dict, matched_trace_time,
-                                    pm_matched_trace_time)
-                                for key in swtobj_dict.keys():
-                                    swt = swtobj_dict[key]
-                                    if (len(swt.handler_list) == 0) and (
-                                                len(swt.monitor_list) == 0):
-                                        brief_trace = swt.event_log
-                                        whole_trace = swt.event_log
-                                    else:
-                                        for item in swt.handler_list:
-                                            # if item.later_trace['is_valid']:
-                                            #    current_trace = \
-                                            #
-                                            # flymeparser.get_swt_report_trace(
-                                            #            item.later_trace[
-                                            #                'content'],
-                                            #            item.thread_name)
-                                            #    if not current_trace:
-                                            #        flymeprint.warning(
-                                            #            'current trace empty')
-                                            #        break
-                                            #    else:
-                                            #        whole_trace += (
-                                            #            current_trace + '\n')
-                                            #        brief_trace += (
-                                            #
-                                            # flymeparser.get_brief_trace(
-                                            #                current_trace,
-                                            #                False) +
-                                            #            '\n')
-                                            #        # whole_trace += (
-                                            #        #    item.later_trace[
-                                            #        #        'content'] + '\n')
-                                            #        # brief_trace += (
-                                            #        #
-                                            #        #
-                                            # flymeparser.get_brief_trace(
-                                            #        #        item.later_trace[
-                                            #        #            'content'] +
-                                            #        #  '\n'))
-                                            # else:
-                                            #    whole_trace +=
-                                            # item.later_trace[
-                                            #        'i_r']
-                                            #    brief_trace = whole_trace
-                                            #    break
-                                            wbdict = \
-                                                get_checker_whole_brief_trace(
-                                                    item)
-                                            whole_trace += wbdict['whole_trace']
-                                            brief_trace += wbdict['brief_trace']
-                                            if wbdict['should_break']:
-                                                break
-                                        for item in swt.monitor_list:
-                                            wbdict = \
-                                                get_checker_whole_brief_trace(
-                                                    item)
-                                            whole_trace += wbdict['whole_trace']
-                                            brief_trace += wbdict['brief_trace']
-                                            if wbdict['should_break']:
-                                                break
-                                    break
-                            else:
-                                is_trace_matched = False
-                                flymeprint.error('no trace matched')
-                                reason = 'no matched trace found for swt time'
-                                whole_trace = reason
-                                brief_trace = reason
-                        else:
-                            is_valid_trace = False
-                            flymeprint.error('no valid trace')
-                            reason = 'no system_server trace found'
-                            whole_trace = reason
-                            brief_trace = reason
-                    else:
-                        is_valid_swt = False
-                        flymeprint.debug('not swt')
-                        reason = 'no watchdog keyword found in event log'
-                        whole_trace = reason
-                        brief_trace = reason
+                    res_dict = swtmanager.start(root)
+                    if res_dict:
+                        brief_trace = res_dict.popitem()[1]
                 elif exception_class == 'Java (JE)':
                     flymeprint.debug('exception class:Java (JE)')
-                    whole_trace = flymeparser.get_je_trace(exp_main_content)
-                    brief_trace = flymeparser.get_brief_trace(whole_trace, True)
+                    res_dict = jemanager.start(root)
+                    if res_dict:
+                        brief_trace = res_dict.popitem()[1]
                 elif exception_class == 'Native (NE)':
-                    whole_trace = flymeparser.get_ne_trace(exp_main_content)
-                    brief_trace = flymeparser.get_brief_ne_trace(whole_trace)
                     flymeprint.debug('exception class:Native (NE)')
+                    res_dict = nemanager.start(root)
+                    if res_dict:
+                        brief_trace = res_dict.popitem()[1]
                 else:
                     flymeprint.debug(
                         'exception class:' + exception_class + ',ignored...')
                     reason = 'ignored exception class'
-                    whole_trace = reason
                     brief_trace = reason
+                if not brief_trace:
+                    brief_trace = 'null brief trace'
                 if os.path.exists(db_dir):
                     additional_dict = {'db_dir': db_dir, 'zip_md5': zip_md5sum,
                                        'db_md5': db_md5_sum,
-                                       'whole_trace': whole_trace.replace('\'',
-                                                                          '\'\''),
                                        'brief_trace': brief_trace.replace('\'',
                                                                           '\'\''),
                                        'exception_class': exception_class,
@@ -242,7 +130,7 @@ def extract_log_to_db(cursor, table_name, row, zip_file, zip_md5sum):
                         flymeparser.insert_to_database(cursor, table_name, row,
                                                        additional_dict)
                     except Exception as ex:
-                        flymeprint.warning(ex)
+                        traceback.print_exc(file=sys.stdout)
                 else:
                     flymeprint.error('db dir not match with db file')
                 fd.close()

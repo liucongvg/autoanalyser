@@ -7,6 +7,7 @@ import subprocess
 import zipfile
 from datetime import datetime
 import sys
+import traceback
 
 # from com.flyme.autoanalyser.anranalyser.BaseAnrObj import BaseAnrObj
 # from com.flyme.autoanalyser.anranalyser.state.Blocked import Blocked
@@ -29,7 +30,7 @@ try:
     import requests
     import pymysql
 except Exception as ex:
-    flymeprint.error(ex)
+    traceback.print_exc(file=sys.stdout)
 
 
 # def parseDropbox(root_path):
@@ -205,14 +206,14 @@ except Exception as ex:
 #    return True
 
 
-def cleanAndBuildDir(*dirs):
+def clean_and_build_dir(*dirs):
     try:
         for i in dirs:
             if os.path.exists(i):
                 shutil.rmtree(i)
             os.makedirs(i)
     except Exception as ex:
-        flymeprint.warning(ex)
+        traceback.print_exc(file=sys.stdout)
         return False
     return True
 
@@ -226,7 +227,7 @@ def clean_files(*files):
                 else:
                     os.remove(file)
     except Exception as ex:
-        flymeprint.error(ex)
+        traceback.print_exc(file=sys.stdout)
 
 
 def extractGz(src, dest=None):
@@ -239,7 +240,7 @@ def extractGz(src, dest=None):
             newFile.write(wholeFile)
             newFile.close()
     except Exception as ex:
-        flymeprint.warning(ex)
+        traceback.print_exc(file=sys.stdout)
         return None
     return wholeFile
 
@@ -729,69 +730,72 @@ def get_trace_time_for_anr(content, package_name):
 
 
 def get_blocked_trace(whole_trace_content, thread_name):
-    # mainConcernedTrace = dict()
+    # main_concerned_trace = dict()
     # match = re.search("^(\"(main)\".*?tid=(\d+).*? (\w*)(.|\n)*?)(\n|\r\n){
     # 2}?",
     #                  allMain, re.M)
     # if not match:
-    #    return mainConcernedTrace
-    # mainTrace = match.group(1)
-    # mainName = match.group(2)
-    # mainLocalTid = match.group(3)
-    # mainState = match.group(4)
-    # mainConcernedTrace[mainLocalTid] = {"trace": mainTrace,
-    #                                    "thread_state": mainState,
-    #                                    "thread_name": mainName}
-    # mainConcernedTrace["__thread_sequece__"] = mainLocalTid
-    # lastLocalThreadTid = mainLocalTid
-    # while mainConcernedTrace[lastLocalThreadTid]["thread_state"] == 'Blocked':
+    #    return main_concerned_trace
+    # main_trace = match.group(1)
+    # main_name = match.group(2)
+    # main_local_tid = match.group(3)
+    # main_state = match.group(4)
+    # main_concerned_trace[main_local_tid] = {"trace": main_trace,
+    #                                    "thread_state": main_state,
+    #                                    "thread_name": main_name}
+    # main_concerned_trace["__thread_sequece__"] = main_local_tid
+    # last_local_thread_tid = main_local_tid
+    # while main_concerned_trace[last_local_thread_tid]["thread_state"] ==
+    # 'Blocked':
     #    match = re.search("waiting to lock.*held by thread (\d+)",
-    #                      mainConcernedTrace[lastLocalThreadTid]["trace"])
+    #                      main_concerned_trace[last_local_thread_tid]["trace"])
     #    if not match:
-    #        return mainConcernedTrace
-    #    lockedTid = match.group(1)
-    #    mainConcernedTrace[lastLocalThreadTid]["locked_tid"] = lockedTid
+    #        return main_concerned_trace
+    #    locked_tid = match.group(1)
+    #    main_concerned_trace[last_local_thread_tid]["locked_tid"] = locked_tid
     #    match = re.search(
-    #        "\"(.*)\" prio=.*tid=" + lockedTid + " (\w*)(.|\n)*?((\n|\r\n){"
+    #        "\"(.*)\" prio=.*tid=" + locked_tid + " (\w*)(.|\n)*?((\n|\r\n){"
     #                                             "2}?)",
     #        allMain)
     #    if not match:
-    #        return mainConcernedTrace
-    #    threadTrace = match.group(0).rstrip(match.group(4))
-    #    threadName = match.group(1)
-    #    threadState = match.group(2)
-    #    mainConcernedTrace[lockedTid] = {"trace": threadTrace,
-    #                                     "thread_state": threadState,
-    #                                     'thread_name': threadName}
-    #    mainConcernedTrace["__thread_sequece__"].append(lockedTid)
-    #    lastLocalThreadTid = lockedTid
-    # return mainConcernedTrace
-    mainConcernedTrace = dict()
+    #        return main_concerned_trace
+    #    thread_trace = match.group(0).rstrip(match.group(4))
+    #    thread_name = match.group(1)
+    #    thread_state = match.group(2)
+    #    main_concerned_trace[locked_tid] = {"trace": thread_trace,
+    #                                     "thread_state": thread_state,
+    #                                     'thread_name': thread_name}
+    #    main_concerned_trace["__thread_sequece__"].append(locked_tid)
+    #    last_local_thread_tid = locked_tid
+    # return main_concerned_trace
+    main_concerned_trace = dict()
     # match = re.search(
     #    "(\"(" + thread_name + ")\".*?tid=(\d+).*? (\w*)(.|\n)*?)(\n|\r\n){
     # 2}?",
     #    whole_trace_content)
+    is_dead_lock = False
     match = parse_trace(whole_trace_content, thread_name)
     if not match:
-        return mainConcernedTrace
-    mainTrace = match.group(1)
-    mainName = match.group(2)
-    mainLocalTid = match.group(3)
-    mainState = match.group(4)
-    mainConcernedTrace[mainLocalTid] = {"trace": mainTrace,
-                                        "thread_state": mainState,
-                                        "thread_name": mainName}
-    mainConcernedTrace["__thread_sequece__"] = [mainLocalTid]
-    lastLocalThreadTid = mainLocalTid
-    while mainConcernedTrace[lastLocalThreadTid][
+        return main_concerned_trace
+    main_trace = match.group(1)
+    main_name = match.group(2)
+    main_local_tid = match.group(3)
+    main_state = match.group(4)
+    main_concerned_trace[main_local_tid] = {"trace": main_trace,
+                                            "thread_state": main_state,
+                                            "thread_name": main_name}
+    main_concerned_trace["__thread_sequece__"] = [main_local_tid]
+    last_local_thread_tid = main_local_tid
+    while main_concerned_trace[last_local_thread_tid][
         "thread_state"] == 'Blocked':
         match = re.search("waiting to lock.*held by thread (\d+)",
-                          mainConcernedTrace[lastLocalThreadTid]["trace"])
+                          main_concerned_trace[last_local_thread_tid]["trace"])
         if not match:
             match = re.search('waiting to lock (<\w+?>) ',
-                              mainConcernedTrace[lastLocalThreadTid]['trace'])
+                              main_concerned_trace[last_local_thread_tid][
+                                  'trace'])
             if not match:
-                return mainConcernedTrace
+                return main_concerned_trace
             else:
                 lock = match.group(1)
                 match = re.search(
@@ -800,32 +804,94 @@ def get_blocked_trace(whole_trace_content, thread_name):
                     lock + ' (.|\n)*?)\n{2}',
                     whole_trace_content, re.M)
                 if not match:
-                    return mainConcernedTrace
-                lockedTid = match.group(3)
-                threadTrace = match.group(1)
-                threadName = match.group(2)
-                threadState = match.group(4)
+                    return main_concerned_trace
+                locked_tid = match.group(3)
+                thread_trace = match.group(1)
+                thread_name = match.group(2)
+                thread_state = match.group(4)
         else:
-            lockedTid = match.group(1)
+            locked_tid = match.group(1)
             match = re.search(
-                "\"(.*)\" prio=.*tid=" + lockedTid + " (\w*)(.|\n)*?(("
-                                                     "\n|\r\n){2}?)",
+                "\"(.*)\" prio=.*tid=" + locked_tid + " (\w*)(.|\n)*?(("
+                                                      "\n|\r\n){2}?)",
                 whole_trace_content)
             if not match:
-                return mainConcernedTrace
+                return main_concerned_trace
             else:
-                threadTrace = match.group(0).rstrip(match.group(4))
-                threadName = match.group(1)
-                threadState = match.group(2)
-        mainConcernedTrace[lastLocalThreadTid]["locked_tid"] = lockedTid
-        if lockedTid in mainConcernedTrace:
+                thread_trace = match.group(0).rstrip(match.group(4))
+                thread_name = match.group(1)
+                thread_state = match.group(2)
+        main_concerned_trace[last_local_thread_tid]["locked_tid"] = locked_tid
+        if locked_tid in main_concerned_trace:
+            flymeprint.warning('dead lock detected')
+            is_dead_lock = True
+            main_concerned_trace[
+                'dead_lock_message'] = thread_name + ' dead locked with ' + \
+                                       main_concerned_trace[locked_tid][
+                                           'thread_name']
+            main_concerned_trace['dead_lock_thread'] = list()
+            target_index = main_concerned_trace['__thread_sequece__'].index(
+                locked_tid)
+            current_index = 0
+            for i in main_concerned_trace['__thread_sequece__']:
+                if current_index < target_index:
+                    current_index += 1
+                    continue
+                main_concerned_trace['dead_lock_trace'].append(
+                    main_concerned_trace[i]['trace'])
             break
-        mainConcernedTrace[lockedTid] = {"trace": threadTrace,
-                                         "thread_state": threadState,
-                                         'thread_name': threadName}
-        mainConcernedTrace["__thread_sequece__"].append(lockedTid)
-        lastLocalThreadTid = lockedTid
-    return mainConcernedTrace
+        main_concerned_trace[locked_tid] = {"trace": thread_trace,
+                                            "thread_state": thread_state,
+                                            'thread_name': thread_name}
+        main_concerned_trace["__thread_sequece__"].append(locked_tid)
+        last_local_thread_tid = locked_tid
+    main_concerned_trace['is_dead_lock'] = is_dead_lock
+    return main_concerned_trace
+
+
+def get_blocked_next_trace(whole_trace_content, thread_name):
+    match = parse_trace(whole_trace_content, thread_name)
+    if not match:
+        return None
+    thread_trace = match.group(1)
+    thread_local_tid = match.group(3)
+    thread_state = match.group(4)
+    if thread_state != 'Blocked':
+        return None
+    match = re.search("waiting to lock.*held by thread (\d+)",
+                      thread_trace)
+    if not match:
+        match = re.search('waiting to lock (<\w+?>) ',
+                          thread_trace)
+        if not match:
+            return None
+        else:
+            lock = match.group(1)
+            match = re.search(
+                '(^\"(.*?)\" prio=\d+ tid=(\d+) (\w*?)\n(.|\n)*?^  - '
+                'locked ' +
+                lock + ' (.|\n)*?)\n{2}',
+                whole_trace_content, re.M)
+            if not match:
+                return None
+            # locked_tid = match.group(3)
+            thread_trace = match.group(1)
+            thread_name = match.group(2)
+            thread_state = match.group(4)
+    else:
+        locked_tid = match.group(1)
+        match = re.search(
+            "\"(.*)\" prio=.*tid=" + locked_tid + " (\w*)(.|\n)*?(("
+                                                  "\n|\r\n){2}?)",
+            whole_trace_content)
+        if not match:
+            return None
+        else:
+            thread_trace = match.group(0).rstrip(match.group(4))
+            thread_name = match.group(1)
+            thread_state = match.group(2)
+    return {'thread_state': thread_state, 'trace': thread_trace,
+            'thread_name': thread_name}
 
 
 def get_blocked_trace_str(whole_trace, thread_name):
@@ -845,10 +911,16 @@ def get_thread_state(whole_trace, thread_name):
 
 
 def parse_trace(whole_trace, thread_name):
-    return re.search(
+    match = re.search(
         "^(\"(" + thread_name + ")\".*?tid=(\d+).*? (\w*)(.|\n)*?)(\n|\r\n){"
                                 "2}?",
         whole_trace, re.M)
+    if not match:
+        match = re.search(
+            "^(\"(" + thread_name + ")\" sysTid=(\d+)\n(.|\n)*?)(\n){"
+                                    "2}?",
+            whole_trace, re.M)
+    return match
 
 
 def get_trace(whole_trace, thread_name):
@@ -929,6 +1001,20 @@ def get_wd_ss_pid(content):  # content is matched watchdog content
         return match.group(1)
 
 
+def is_sf_hang(event_log):
+    match = re.search('surfaceflinger  hang\.$', event_log)
+    if match:
+        return True
+    return False
+
+
+def get_sf_hang_brief_trace(event_log):
+    match = re.search('(surfaceflinger  hang\.)', event_log)
+    if match:
+        return match.group(1)
+    return None
+
+
 def get_watchdog_hlist_event_log(content):
     match = re.findall(
         '(Blocked in handler on (?P<handler_name>.*?) \(('
@@ -958,10 +1044,11 @@ def get_trace_time_pid_for_wd(content):
 
 def get_trace_time_pid(content, pid, process_name):
     match = re.findall(
-        '^----- pid ' + '(' + pid + ')' + ' at (\d{4}-\d{2}-\d{2} \d{2}:\d{'
-                                          '2}:\d{2}) '
-                                          '-----\nCmd line: ' + process_name
-        #    + '\n(.|\n)*?----- end ' + pid + ' -----'
+        '^(----- pid ' + '(' + pid + ')' + ' at (\d{4}-\d{2}-\d{2} \d{2}:\d{'
+                                           '2}:\d{2}) '
+                                           '-----\nCmd line: ' + process_name
+        + ')'
+        + '\n(.|\n)*?----- end ' + pid + ' -----'
         , content, re.M)
     if match:
         return match
@@ -980,20 +1067,48 @@ def is_trace_blocked_in_binder(content):  # content is single thread trace
 
 
 def parse_db_pt_by_pid_tname(content, pid, thread_name):
-    if thread_name == 'main':
-        match = re.search(
-            '^u:r:system_server:s0 +system +(?P<pid>' + pid + ') +(?P<ppid>'
-            + '\d+' +
-            ').*? +' +
-            '(?P<name>' + 'system_server' + ')$', content, re.M)
+    # if thread_name == 'main':
+    # match = re.search(
+    #    '^u:r:system_server:s0 +system +(?P<pid>' + pid + ') +(?P<ppid>'
+    #    + '\d+' +
+    #    ').*? +' +
+    #    '(?P<name>' + 'system_server' + ')$', content, re.M)
+    match = re.search('^LABEL', content)
+    if match:
+        match_p = re.search(
+            '^(\w|:|_|\.)+ +(\w|_)+ +' + '(?P<pid>' + pid + ')' + ' +' + '(?P<ppid>\d+)' + '.* +(?P<process_name>' + '(\w|:|_|\.)+' + ')$',
+            content, re.M)
     else:
-        match = re.search(
-            '^u:r:system_server:s0 +system +(?P<pid>\d+) +(?P<ppid>' + pid +
-            ').*?' +
-            '(?P<name>' + thread_name + ')$', content, re.M)
-    if not match:
+        match_p = re.search(
+            '^(\w|_)+ +' + '(?P<pid>' + pid + ')' + ' +' + '(?P<ppid>\d+)' +
+            '.* +(?P<process_name>' + '(\w|:|_|\.)+' + ')$',
+            content, re.M)
+    if not match_p:
         return None
-    return match.groupdict()
+    res_dict = match_p.groupdict()
+    if thread_name != 'main':
+        # match = re.search(
+        #    '^u:r:system_server:s0 +system +(?P<pid>\d+) +(?P<ppid>' + pid +
+        #    ').*?' +
+        #    '(?P<name>' + thread_name + ')$', content, re.M)
+        if match:
+            match_t = re.search(
+                '^(\w|:|_|\.)+ +(\w|_)+ +' + '(?P<pid>\d+)' + ' +' + '(?P<ppid>' + pid +
+                ')' + '.* +(?P<thread_name>'
+                + thread_name + ')$',
+                content, re.M)
+        else:
+            match_t = re.search(
+                '^(\w|_)+ +' + '(?P<pid>\d+)' + ' +' + '(?P<ppid>' + pid +
+                ')' + '.* +(?P<thread_name>'
+                + thread_name + ')$',
+                content, re.M)
+        if not match_t:
+            return None
+        process_name = res_dict['process_name']
+        res_dict = match_t.groupdict()
+        res_dict['process_name'] = process_name
+    return res_dict
 
 
 def parse_db_bi_by_pid_tid(content, pid, tid):
@@ -1002,23 +1117,41 @@ def parse_db_bi_by_pid_tid(content, pid, tid):
                                                                        '?P<pid>\d+):(?P<tid>\d+)',
         content, re.M)
     if not match:
-        return None
+        match = re.search(
+            '^    incoming transaction \d+: \w+ from ' + pid + ':' + tid + ' to (?P<pid>\d+):(?P<tid>\d+)',
+            content, re.M)
+        if not match:
+            return None
     return match.groupdict()
 
 
 def parse_db_pt_by_pid_tid(content, pid, tid):
-    match_t = re.search(
-        '^(\w|:|_)+ +\w+ +' + tid + ' +' + pid + '.* +(?P<thread_name>('
-                                                 '\w|:|_)+)$',
-        content, re.M)
+    match = re.search('^LABEL', content)
+    if match:
+        match_t = re.search(
+            '^(\w|:|_)+ +(\w|_)+ +' + tid + ' +' + pid + '.* +(?P<thread_name>('
+                                                         '\w|:|_)+)$',
+            content, re.M)
+    else:
+        match_t = re.search(
+            '^(\w|_)+ +' + tid + ' +' + pid + '.* +(?P<thread_name>('
+                                              '\w|:|_)+)$',
+            content, re.M)
     if not match_t:
         return None
     match_t = match_t.groupdict()
-    match_p = re.search(
-        '^(\w|:|_)+ +\w+ +' + pid + ' +' + '\d+' + '.* +('
-                                                   '?P<process_name>('
-                                                   '\w|:|_|/)+)$',
-        content, re.M)
+    if match:
+        match_p = re.search(
+            '^(\w|:|_)+ +\w+ +' + pid + ' +' + '\d+' + '.* +('
+                                                       '?P<process_name>('
+                                                       '\w|:|_|/|\.)+)$',
+            content, re.M)
+    else:
+        match_p = re.search(
+            '(\w|_)+ +' + pid + ' +' + '\d+' + '.* +('
+                                               '?P<process_name>('
+                                               '\w|:|_|/|\.)+)$',
+            content, re.M)
     if not match_p:
         return None
     match_p = match_p.groupdict()
@@ -1027,24 +1160,25 @@ def parse_db_pt_by_pid_tid(content, pid, tid):
     return match_t
 
 
-def get_ss_pid_by_swtdir(dir):
-    swt_dir = os.path.dirname(dir)
-    for file in os.listdir(swt_dir):
+def get_ss_pid_by_expdir(dir):
+    # swt_dir = os.path.dirname(dir)
+    for file in os.listdir(dir):
         if file == 'ZZ_INTERNAL':
-            content = open(os.path.join(swt_dir, file), 'r',
+            content = open(os.path.join(dir, file), 'r',
                            encoding='utf-8').read()
-            match = re.search('^SWT,(\d+),', content)
+            match = re.search('^(SWT|Native \(NE\)|Java \(JE\)),(\d+),',
+                              content)
             if not match:
                 return None
-            return match.group(1)
+            return match.group(2)
     return None
 
 
-def is_swt_dir(dir):
-    return is_fname_match(dir, 'db\.fatal\.\d{2}\.SWT\.dbg\.DEC')
+def is_exp_dir(dir):
+    return is_fname_match(dir, 'db\.fatal\.\d{2}\.(SWT|JE|NE)\.dbg\.DEC')
 
 
-def find_min_time(target_time_str, tl_str_to_be_compared, is_later):
+def find_min_time(target_time_str, tl_str_to_be_compared):
     target_time_struct = datetime.strptime(target_time_str, '%Y-%m-%d %H:%M:%S')
     count = target_time_struct.timestamp()
     interval = sys.maxsize
@@ -1094,7 +1228,7 @@ def download_log(uri, ouc_dest_dir):
         md5sum = hashlib.md5(r.content).hexdigest()
         fd.close()
     except Exception as ex:
-        flymeprint.error(ex)
+        traceback.print_exc(file=sys.stdout)
         return None
     return (zip_whole_name, md5sum)
 
@@ -1121,11 +1255,13 @@ def insert_to_database(cursor, table_name, raw, additional_dict):
     insert_str_list.append(values_str)
     insert_str_list.append(')')
     final_insert_str = ''.join(insert_str_list)
-    flymeprint.debug('excuting insert sql:' + final_insert_str)
+    flymeprint.debug('excuting insert sql:\n' + final_insert_str)
     cursor.execute(final_insert_str)
 
 
 def get_brief_trace(whole_trace, is_je):
+    if whole_trace is None:
+        return None
     if is_je:
         main_trace_list = re.findall('^\tat (.*?)\(.*?\)(\n|\r\n)?',
                                      whole_trace, re.M)
@@ -1186,6 +1322,8 @@ def get_ne_trace(content):
 
 def get_brief_ne_trace(whole_trace):
     match = re.findall('^    #\d+ pc \w+  .*? \((.*?)\)', whole_trace, re.M)
+    if not match:
+        match = re.findall('^  #\d+ pc \w+  .*? \((.*?)\)', whole_trace, re.M)
     match_count = 0
     brief_trace = ''
     for i in match:
@@ -1217,3 +1355,51 @@ def get_swt_report_trace(whole_trace, thread_name):
         trace_dict = get_trace(whole_trace, thread_name)
         trace = trace_dict['trace']
     return trace
+
+
+def is_binder_full(whole_trace):
+    if not whole_trace:
+        return False
+    else:
+        match = re.search('^  at android.os.Binder.blockUntilThreadAvailable',
+                          whole_trace, re.M)
+        if not match:
+            return False
+        else:
+            return True
+
+
+def get_random_binder_trace(whole_trace):
+    match = re.search(
+        '^\"(?P<thread_name>Binder:.*?)\" prio=\d+ tid=\d+ ('
+        '?P<thread_state>\w+)',
+        whole_trace, re.M)
+    if not match:
+        return None
+    return match.groupdict()
+
+
+def write_exception_head(fd, ex_type, ex_reason, ex_final_trace,
+                         ex_others=None):
+    head_break = \
+        '=============================================================================\n'
+    fd.write(head_break)
+    fd.write('exception type:')
+    if ex_type is not None:
+        fd.write(ex_type)
+    else:
+        fd.write('null')
+        flymeprint.warning('exception type None')
+    fd.write('\nexception reason:')
+    if ex_reason is not None:
+        fd.write(ex_reason)
+    else:
+        fd.write('null')
+        flymeprint.warning('exception reason None')
+    fd.write('\nexception final trace:\n')
+    if ex_final_trace is not None:
+        fd.write(ex_final_trace)
+    else:
+        fd.write('null')
+        flymeprint.warning('exception final trace None')
+    fd.write('\n' + head_break)

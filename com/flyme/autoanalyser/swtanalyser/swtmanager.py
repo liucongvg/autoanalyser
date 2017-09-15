@@ -10,7 +10,7 @@ from com.flyme.autoanalyser.cache import cachemanager
 
 
 def start(root_path):
-    parse_swt(root_path)
+    return parse_swt(root_path)
 
 
 def parse_swt(root_path):
@@ -22,26 +22,40 @@ def parse_swt(root_path):
         flymeprint.error('no watchdog keyword found')
         return
     watchdog_formated_dict = parse_watchdog_raw_dict(watchdog_raw_dict)
-    if not watchdog_formated_dict:
-        flymeprint.error('parse_wachdog_raw_dict error')
-        return
-    system_server_trace_time_dict = parse_data_anr_trace(root_path)
-    if not system_server_trace_time_dict:
-        system_server_trace_time_dict = parse_db_trace(root_path)
-    if not system_server_trace_time_dict:
-        flymeprint.error('no system_server trace time')
-        return
-    matched_trace_time = get_matched_trace_time(watchdog_formated_dict,
-                                                system_server_trace_time_dict,
-                                                False)
-    if (not matched_trace_time) or (len(matched_trace_time) <= 1):
-        flymeprint.error('no matched time')
-        return
-    pm_matched_trace_time = get_pm_matched_trace_time(
-        system_server_trace_time_dict, watchdog_formated_dict)
-    swtobj_dict = get_swtobj_dict(watchdog_formated_dict, matched_trace_time,
-                                  pm_matched_trace_time)
-    generate_report(swtobj_dict, root_path)
+    is_sf_hang = True
+    for time_str in watchdog_formated_dict:
+        if '__is_sf_hang__' not in watchdog_formated_dict[time_str] or not \
+                watchdog_formated_dict[time_str]['__is_sf_hang__']:
+            is_sf_hang = False
+    if not is_sf_hang:
+        if not watchdog_formated_dict:
+            flymeprint.error('parse_wachdog_raw_dict error')
+            return
+        system_server_trace_time_dict = parse_data_anr_trace(root_path)
+        if not system_server_trace_time_dict:
+            system_server_trace_time_dict = parse_db_trace(root_path)
+        if not system_server_trace_time_dict:
+            flymeprint.error('no system_server trace time')
+            return
+        elif len(system_server_trace_time_dict) <= 1:
+            flymeprint.error(
+                'only one system_server trace found, not enough to analysis')
+            return
+        matched_trace_time = get_matched_trace_time(watchdog_formated_dict,
+                                                    system_server_trace_time_dict,
+                                                    False)
+        if not matched_trace_time:
+            flymeprint.error('no matched time')
+            return
+        pm_matched_trace_time = get_pm_matched_trace_time(
+            system_server_trace_time_dict, watchdog_formated_dict)
+        swtobj_dict = get_swtobj_dict(watchdog_formated_dict,
+                                      matched_trace_time,
+                                      pm_matched_trace_time)
+    else:
+        flymeprint.debug('sf hang...')
+        swtobj_dict = get_swtobj_dict(watchdog_formated_dict, None, None)
+    return generate_report(swtobj_dict, root_path)
 
 
 def get_pm_matched_trace_time(system_server_trace_time_dict,
@@ -64,6 +78,7 @@ def get_pm_matched_trace_time(system_server_trace_time_dict,
 
 
 def parse_db_watchdog(root_path):
+    flymeprint.debug('parsing db watchdog...')
     cachemanager.root_path = root_path
     db_event_log_files = cachemanager.get_db_event_log_files()
     return parse_event_log_for_wd_by_entries(db_event_log_files)
@@ -71,10 +86,12 @@ def parse_db_watchdog(root_path):
 
 def generate_report(swtobj_dict, root_path):
     report_dir = os.path.join(root_path, '__swtanalyser__')
-    flymeparser.cleanAndBuildDir(report_dir)
+    flymeparser.clean_and_build_dir(report_dir)
+    result_dict = dict()
     for time_str in swtobj_dict:
         swtobj = swtobj_dict[time_str]
-        swtobj.generate_report(report_dir)
+        result_dict[time_str] = swtobj.generate_report(report_dir)
+    return result_dict
 
 
 def get_swtobj_dict(watchdog_formated_dict, matched_trace_time,
@@ -82,61 +99,71 @@ def get_swtobj_dict(watchdog_formated_dict, matched_trace_time,
     swtobj_dict = dict()
     for time_str in watchdog_formated_dict:
         pid = watchdog_formated_dict[time_str]['pid']
-        whole_trace_dict = get_whole_trace_dict(time_str, matched_trace_time)
-        if pm_matched_trace_time:
-            pm_whole_trace_dict = get_whole_trace_dict(time_str,
-                                                       pm_matched_trace_time)
-            pm_whole_previous_trace = pm_whole_trace_dict['previous_trace']
-            pm_whole_later_trace = pm_whole_trace_dict['later_trace']
-        if not whole_trace_dict:
-            flymeprint.error('empty whole_trace_dict')
-            continue
-        whole_previous_trace = whole_trace_dict['previous_trace']
-        whole_later_trace = whole_trace_dict['later_trace']
-        # swtobj_dict[time_str] = dict()
-        # swtobj_dict[time_str]['event_log'] = watchdog_formated_dict[time_str][
-        #    'event_log']
-        checker_list = watchdog_formated_dict[time_str]['checker_list']
-        # swtobj_dict[time_str]['monitor_list'] = list()
-        # swtobj_dict[time_str]['handler_list'] = list()
-        monitor_list = list()
-        handler_list = list()
-        for checker in checker_list:
-            checker_name = checker['checker_name']
-            thread_name = checker['thread_name']
-            event_log = checker['event_log']
-            if checker['checker_type'] == 'handler':
-                if (
-                            thread_name == 'PackageManager') and \
-                        pm_matched_trace_time:
-                    handler = Handler(
-                        watchdog_formated_dict[time_str]['time_struct'], pid,
-                        checker_name, thread_name, event_log,
-                        pm_whole_previous_trace,
-                        pm_whole_later_trace)
-                else:
-                    handler = Handler(
-                        watchdog_formated_dict[time_str]['time_struct'], pid,
-                        checker_name, thread_name, event_log,
-                        whole_previous_trace,
-                        whole_later_trace)
-                    # swtobj_dict[time_str]['handler_list'].append(handler)
-                handler_list.append(handler)
-            elif checker['checker_type'] == 'monitor':
-                class_name = checker['checker_class_name']
-                monitor = Monitor(
-                    watchdog_formated_dict[time_str]['time_struct'], pid,
-                    class_name, checker_name, thread_name,
-                    event_log, whole_previous_trace,
-                    whole_later_trace)
-                # swtobj_dict[time_str]['monitor_list'].append(monitor)
-                monitor_list.append(monitor)
-            else:
+        is_sf_hang = False
+        if watchdog_formated_dict[time_str]['__is_sf_hang__']:
+            handler_list = list()
+            monitor_list = list()
+            is_sf_hang = True
+        else:
+            whole_trace_dict = get_whole_trace_dict(time_str,
+                                                    matched_trace_time)
+            if pm_matched_trace_time:
+                pm_whole_trace_dict = get_whole_trace_dict(time_str,
+                                                           pm_matched_trace_time)
+                pm_whole_previous_trace = pm_whole_trace_dict['previous_trace']
+                pm_whole_later_trace = pm_whole_trace_dict['later_trace']
+            if not whole_trace_dict:
+                flymeprint.error('empty whole_trace_dict')
                 continue
+            whole_previous_trace = whole_trace_dict['previous_trace']
+            whole_later_trace = whole_trace_dict['later_trace']
+            # swtobj_dict[time_str] = dict()
+            # swtobj_dict[time_str]['event_log'] = watchdog_formated_dict[
+            # time_str][
+            #    'event_log']
+            checker_list = watchdog_formated_dict[time_str]['checker_list']
+            # swtobj_dict[time_str]['monitor_list'] = list()
+            # swtobj_dict[time_str]['handler_list'] = list()
+            monitor_list = list()
+            handler_list = list()
+            for checker in checker_list:
+                checker_name = checker['checker_name']
+                thread_name = checker['thread_name']
+                event_log = checker['event_log']
+                if checker['checker_type'] == 'handler':
+                    if (
+                                thread_name == 'PackageManager') and \
+                            pm_matched_trace_time:
+                        handler = Handler(
+                            watchdog_formated_dict[time_str]['time_struct'],
+                            pid,
+                            checker_name, thread_name, event_log,
+                            pm_whole_previous_trace,
+                            pm_whole_later_trace)
+                    else:
+                        handler = Handler(
+                            watchdog_formated_dict[time_str]['time_struct'],
+                            pid,
+                            checker_name, thread_name, event_log,
+                            whole_previous_trace,
+                            whole_later_trace)
+                        # swtobj_dict[time_str]['handler_list'].append(handler)
+                    handler_list.append(handler)
+                elif checker['checker_type'] == 'monitor':
+                    class_name = checker['checker_class_name']
+                    monitor = Monitor(
+                        watchdog_formated_dict[time_str]['time_struct'], pid,
+                        class_name, checker_name, thread_name,
+                        event_log, whole_previous_trace,
+                        whole_later_trace)
+                    # swtobj_dict[time_str]['monitor_list'].append(monitor)
+                    monitor_list.append(monitor)
+                else:
+                    continue
         swtobj = SwtObj(pid, time_str,
                         watchdog_formated_dict[time_str]['event_log'],
                         watchdog_formated_dict[time_str]['file_name'],
-                        handler_list, monitor_list)
+                        handler_list, monitor_list, is_sf_hang)
         swtobj_dict[time_str] = swtobj
     return swtobj_dict
 
@@ -166,6 +193,16 @@ def get_whole_trace_dict(time_str, matched_trace_time):
     later_trace_content = flymeparser.get_whole_trace_str(whole_later_content,
                                                           'system_server',
                                                           later_matched_time_str)
+    if 'best_alternative_previous_head' in matched_trace_time[time_str]:
+        best_previous_head = matched_trace_time[time_str][
+            'best_alternative_previous_head']
+    else:
+        best_previous_head = matched_trace_time[time_str]['best_previous_head']
+    if 'best_alternative_later_head' in matched_trace_time[time_str]:
+        best_later_head = matched_trace_time[time_str][
+            'best_alternative_later_head']
+    else:
+        best_later_head = matched_trace_time[time_str]['best_later_head']
     whole_trace_dict['previous_trace'] = {'time': previous_matched_time_str,
                                           'content': previous_trace_content,
                                           'is_valid':
@@ -174,7 +211,8 @@ def get_whole_trace_dict(time_str, matched_trace_time):
                                           'i_r': matched_trace_time[time_str][
                                               'p_i_r'], 'file_name':
                                               matched_trace_time[time_str][
-                                                  'previous_file_name']}
+                                                  'previous_file_name'],
+                                          'head': best_previous_head}
     whole_trace_dict['later_trace'] = {'time': later_matched_time_str,
                                        'content': later_trace_content,
                                        'is_valid': matched_trace_time[time_str][
@@ -182,7 +220,8 @@ def get_whole_trace_dict(time_str, matched_trace_time):
                                        'i_r': matched_trace_time[time_str][
                                            'l_i_r'],
                                        'file_name': matched_trace_time[
-                                           time_str]['later_file_name']}
+                                           time_str]['later_file_name'],
+                                       'head': best_later_head}
     return whole_trace_dict
 
 
@@ -239,6 +278,10 @@ def parse_watchdog_raw_dict(watchdog_lists):
             #    '(Blocked in handler on (?P<handler_name>.*?) \(('
             #    '?P<thread_name>.*?)\))',
             #    content)
+            if flymeparser.is_sf_hang(content):
+                watchdog_formated_dict[time_str]['__is_sf_hang__'] = True
+                continue
+            watchdog_formated_dict[time_str]['__is_sf_hang__'] = False
             matched_list = flymeparser.get_watchdog_hlist_event_log(content)
             if matched_list:
                 for i in matched_list:
@@ -290,13 +333,14 @@ def parse_data_anr_entries(data_anr_entries):
         if not matched_list:
             continue
         for entry in matched_list:
-            pid = entry[0]
-            time_str = entry[1]
+            head = entry[0]
+            pid = entry[1]
+            time_str = entry[2]
             trace_time = datetime.strptime(time_str, '%Y-%m-%d %H:%M:%S')
             trace_time_dict[time_str] = {'time_struct': trace_time,
                                          'file_name': file_name,
                                          'content': content,
-                                         'pid': pid}
+                                         'pid': pid, 'head': head}
 
     if len(trace_time_dict) == 0 and len(data_anr_entries) != 0:
         flymeprint.error('no system_server trace matches')
@@ -309,6 +353,7 @@ def parse_data_anr_trace(root_path):
 
 
 def parse_db_trace(root_path):
+    flymeprint.debug('parsing db trace...')
     trace_files = cachemanager.get_db_trace_files()
     return parse_data_anr_entries(trace_files)
 
@@ -351,8 +396,10 @@ def get_matched_trace_time(watchdog_formated_dict,
         best_previous_time_count = best_previous_time_struct.timestamp()
         best_previous_file_name = best_previous_item['file_name']
         best_previous_content = best_previous_item['content']
+        best_previou_time_head = best_previous_item['head']
         if not system_server_trace_time_list:
-            return matched_time
+            flymeprint.error('only one system trace found')
+            continue
         best_later_time_str = max(system_server_trace_time_list)
         best_later_item = ss_pid_matched_trace_dict.pop(best_later_time_str)
         max_time_struct = best_later_time_struct = best_later_item[
@@ -360,6 +407,7 @@ def get_matched_trace_time(watchdog_formated_dict,
         best_later_time_count = best_later_time_struct.timestamp()
         best_later_file_name = best_later_item['file_name']
         best_later_content = best_later_item['content']
+        best_later_time_head = best_later_item['head']
 
         matched_time[watchdog_time_str] = dict()
         no_best_previous_time = True
@@ -408,6 +456,8 @@ def get_matched_trace_time(watchdog_formated_dict,
                     'file_name']
             current_content = \
                 ss_pid_matched_trace_dict[system_server_time_str]['content']
+            current_head = ss_pid_matched_trace_dict[system_server_time_str][
+                'head']
             if no_best_time:
                 change_best_previous = False
                 change_best_later = False
@@ -425,6 +475,7 @@ def get_matched_trace_time(watchdog_formated_dict,
                     best_previous_file_name = current_file_name
                     best_previous_content = current_content
                     best_previous_time_struct = system_server_trace_time_struct
+                    best_previou_time_head = current_head
                 if no_best_later_time:
                     if current_time_interval < later_time_interval:
                         change_best_later = True
@@ -438,6 +489,7 @@ def get_matched_trace_time(watchdog_formated_dict,
                     best_later_file_name = current_file_name
                     best_later_content = current_content
                     best_later_time_struct = system_server_trace_time_struct
+                    best_later_time_head = current_head
             else:
                 if (current_time_interval - middle_t >= 0) and (
                             current_time_interval < previous_time_interval):
@@ -446,6 +498,7 @@ def get_matched_trace_time(watchdog_formated_dict,
                     best_previous_file_name = current_file_name
                     best_previous_content = current_content
                     best_previous_time_struct = system_server_trace_time_struct
+                    best_previou_time_head = current_head
                 if (current_time_interval <= 0) and (
                             current_time_interval > later_time_interval):
                     best_later_time_str = system_server_time_str
@@ -453,6 +506,7 @@ def get_matched_trace_time(watchdog_formated_dict,
                     best_later_file_name = current_file_name
                     best_later_content = current_content
                     best_later_time_struct = system_server_trace_time_struct
+                    best_later_time_head = current_head
         if no_best_time:
             matched_time[watchdog_time_str][
                 'best_alternative_previous_time_str'] = best_previous_time_str
@@ -464,6 +518,10 @@ def get_matched_trace_time(watchdog_formated_dict,
             matched_time[watchdog_time_str][
                 'best_alternative_later_time_struct'] = \
                 best_later_time_struct
+            matched_time[watchdog_time_str][
+                'best_alternative_previous_head'] = best_previou_time_head
+            matched_time[watchdog_time_str][
+                'best_alternative_later_head'] = best_later_time_head
         else:
             matched_time[watchdog_time_str][
                 'best_previous_time_str'] = best_previous_time_str
@@ -473,6 +531,10 @@ def get_matched_trace_time(watchdog_formated_dict,
                 'best_previous_time_struct'] = best_previous_time_struct
             matched_time[watchdog_time_str][
                 'best_later_time_struct'] = best_later_time_struct
+            matched_time[watchdog_time_str][
+                'best_previous_head'] = best_previou_time_head
+            matched_time[watchdog_time_str][
+                'best_later_head'] = best_later_time_head
         current_prev_trunc = watchdog_time_struct.timestamp() - \
                              best_previous_time_struct.timestamp()
         current_later_trunc = best_later_time_struct.timestamp() - \

@@ -1,5 +1,7 @@
 from com.flyme.autoanalyser.utils import flymeparser, flymeprint
 import os
+import traceback
+import sys
 
 root_path = None
 
@@ -20,6 +22,7 @@ db_event_log_dict = dict()
 db_trace_dict = dict()
 db_process_and_threads_dict = dict()
 db_binderif_dict = dict()
+db_exp_main_dict = dict()
 
 
 def get_file_content(src_file, dest_file=None):
@@ -115,20 +118,21 @@ def cache_all_concerned_db_file_entries():
                 # flymeparser.clean_files(os.path.join(current_root_dir, dir))
                 dec_dir = dir
         for file in current_file_entries:
-            if flymeparser.is_fname_match(file, 'db\.fatal\.\d{2}\.SWT\.dbg'):
+            if flymeparser.is_fname_match(file,
+                                          'db\.fatal\.\d{2}\.(SWT|JE|NE)\.dbg'):
                 try:
                     if (not dec_dir) or (dec_dir != file + '.DEC'):
                         flymeparser.extract_db(
                             os.path.join(current_root_dir, file))
                 except Exception as ex:
-                    flymeprint.error(ex)
+                    traceback.print_exc(file=sys.stdout)
     # cache
     for current_root_dir, current_dir_entries, current_file_entries in os.walk(
             root_path):
         for file in current_file_entries:
-            if not flymeparser.is_swt_dir(os.path.basename(current_root_dir)):
+            if not flymeparser.is_exp_dir(os.path.basename(current_root_dir)):
                 continue
-            pid = flymeparser.get_ss_pid_by_swtdir(current_root_dir)
+            pid = flymeparser.get_ss_pid_by_expdir(current_root_dir)
             if flymeparser.is_fname_match(file, 'SYS_ANDROID_EVENT_LOG'):
                 db_event_log_dict[pid] = os.path.join(current_root_dir, file)
                 # db_event_log_files.append(os.path.join(current_root_dir,
@@ -144,6 +148,8 @@ def cache_all_concerned_db_file_entries():
             if flymeparser.is_fname_match(file, 'SYS_BINDER_INFO'):
                 # db_binderif_files.append(os.path.join(current_root_dir, file))
                 db_binderif_dict[pid] = os.path.join(current_root_dir, file)
+            if flymeparser.is_fname_match(file, '__exp_main\.txt'):
+                db_exp_main_dict[pid] = os.path.join(current_root_dir, file)
     return
 
 
@@ -187,6 +193,16 @@ def get_db_bi_dict():
     return db_binderif_dict
 
 
+def get_db_exp_main_files():
+    return get_db_exp_main_dict().values()
+
+
+def get_db_exp_main_dict():
+    if not cached_2:
+        cache_all_concerned_db_file_entries()
+    return db_exp_main_dict
+
+
 def cache_all_file_entries():
     global cached_1
     cached_1 = True
@@ -216,11 +232,11 @@ def free_cache():
     global event_log_watchdog_cache
     event_log_watchdog_cache = dict()
     global main_log_time_cache
-    main_log_time_cache=dict()
+    main_log_time_cache = dict()
     global all_main_log_time_cache
     all_main_log_time_cache = list()
     global cached_1
-    cached_1=False
+    cached_1 = False
     global dropbox_files
     dropbox_files = list()
     global data_anr_trace_files
@@ -239,3 +255,5 @@ def free_cache():
     db_process_and_threads_dict = dict()
     global db_binderif_dict
     db_binderif_dict = dict()
+    global db_exp_main_dict
+    db_exp_main_dict = dict()

@@ -1,4 +1,6 @@
 import os
+import sys
+import traceback
 
 from com.flyme.autoanalyser.anranalyser.BaseAnrObj import BaseAnrObj
 from com.flyme.autoanalyser.utils import flymeprint
@@ -28,7 +30,7 @@ def parse_dropbox(root_path):
         if not is_dir:
             flymeprint.warning('invalid root dir:' + root_path)
     except Exception as ex:
-        flymeprint.warning(ex)
+        traceback.print_exc(file=sys.stdout)
         return
     # anranalyser
     anranalyser = os.path.join(root_path, '__anranalyser__')
@@ -43,8 +45,8 @@ def parse_dropbox(root_path):
     # notbug directory
     notbug = os.path.join(anranalyser, 'notbug')
 
-    if not flymeparser.cleanAndBuildDir(extractall, merge, bug, undetermined,
-                                        notbug):
+    if not flymeparser.clean_and_build_dir(extractall, merge, bug, undetermined,
+                                           notbug):
         flymeprint.warning('can not cleanAndBuildDir')
         return
 
