@@ -196,7 +196,9 @@ class BaseChecker:
                     from_pid,
                     from_tid)
                 if not pid_tid_dict:
-                    flymeprint.warning('can not find binder entry')
+                    flymeprint.warning(
+                        'can not find binder entry ' + from_pid + ':' +
+                        from_tid)
                     break
                 to_pid = pid_tid_dict['pid']
                 to_tid = pid_tid_dict['tid']

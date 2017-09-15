@@ -90,7 +90,7 @@ def generate_report(swtobj_dict, root_path):
     result_dict = dict()
     for time_str in swtobj_dict:
         swtobj = swtobj_dict[time_str]
-        result_dict[time_str] = swtobj.generate_report(report_dir)
+        result_dict[swtobj.file_name] = swtobj.generate_report(report_dir)
     return result_dict
 
 

@@ -1321,6 +1321,8 @@ def get_ne_trace(content):
 
 
 def get_brief_ne_trace(whole_trace):
+    if not whole_trace:
+        return None
     match = re.findall('^    #\d+ pc \w+  .*? \((.*?)\)', whole_trace, re.M)
     if not match:
         match = re.findall('^  #\d+ pc \w+  .*? \((.*?)\)', whole_trace, re.M)

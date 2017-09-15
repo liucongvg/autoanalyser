@@ -92,6 +92,7 @@ class SwtObj:
                 elif checker.is_unknown:
                     has_unknown = True
                     if checker.brief_trace is None:
+                        unknown_message = checker.error_message
                         continue
                     if checker.brief_trace in unknown_brief_trace:
                         continue
@@ -117,15 +118,15 @@ class SwtObj:
                 ex_reason = unknown_message
                 ex_final_trace = '\n'.join(unknown_error_trace)
                 ex_brief_trace = '_'.join(unknown_brief_trace)
-            if ex_brief_trace is not None:
+            if ex_brief_trace:
                 ex_brief_trace = ex_brief_trace.rstrip('_')
             else:
                 ex_brief_trace = 'null'
-            if ex_final_trace is not None:
+            if ex_final_trace:
                 ex_final_trace = ex_final_trace.rstrip('\n')
             else:
                 ex_final_trace = 'null'
-            if ex_reason is not None:
+            if ex_reason:
                 ex_reason = ex_reason.rstrip(',')
             else:
                 ex_reason = 'null'

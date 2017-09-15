@@ -57,7 +57,6 @@ def parse_excel(excel_fn, ouc_dest_dir):
                     # if loop_count == 10:
                     #    break
         except StopIteration as stop_ex:
-            traceback.print_exc(file=sys.stdout)
             flymeprint.debug('parse excel done')
             # ouc_dest_dir = '/home/liucong/temp/ouc/1503385916.620414'
     except Exception as ex:
@@ -89,7 +88,7 @@ def extract_log_to_db(cursor, table_name, row, zip_file, zip_md5sum):
                 fd = open(to_extract, mode='rb')
                 db_md5_sum = hashlib.md5(fd.read()).hexdigest()
                 db_dir = os.path.join(root, entry + '.DEC')
-                brief_trace = ''
+                brief_trace_list = list()
                 fd = open(os.path.join(db_dir, '__exp_main.txt'),
                           encoding='utf-8')
                 exp_main_content = fd.read()
@@ -100,37 +99,49 @@ def extract_log_to_db(cursor, table_name, row, zip_file, zip_md5sum):
                     flymeprint.debug('exception class:SWT')
                     res_dict = swtmanager.start(root)
                     if res_dict:
-                        brief_trace = res_dict.popitem()[1]
+                        for i in res_dict:
+                            if os.path.dirname(i) == db_dir:
+                                brief_trace_list.append(res_dict[i])
                 elif exception_class == 'Java (JE)':
                     flymeprint.debug('exception class:Java (JE)')
                     res_dict = jemanager.start(root)
                     if res_dict:
-                        brief_trace = res_dict.popitem()[1]
+                        brief_trace_list.append(res_dict.popitem()[1])
                 elif exception_class == 'Native (NE)':
                     flymeprint.debug('exception class:Native (NE)')
                     res_dict = nemanager.start(root)
                     if res_dict:
-                        brief_trace = res_dict.popitem()[1]
+                        brief_trace_list.append(res_dict.popitem()[1])
                 else:
                     flymeprint.debug(
                         'exception class:' + exception_class + ',ignored...')
                     reason = 'ignored exception class'
-                    brief_trace = reason
-                if not brief_trace:
-                    brief_trace = 'null brief trace'
+                    brief_trace_list.append(reason)
+                if not brief_trace_list:
+                    brief_trace_list.append('null brief trace')
                 if os.path.exists(db_dir):
-                    additional_dict = {'db_dir': db_dir, 'zip_md5': zip_md5sum,
-                                       'db_md5': db_md5_sum,
-                                       'brief_trace': brief_trace.replace('\'',
-                                                                          '\'\''),
-                                       'exception_class': exception_class,
-                                       'subject': subject,
-                                       'exception_log_time': exception_log_time}
-                    try:
-                        flymeparser.insert_to_database(cursor, table_name, row,
-                                                       additional_dict)
-                    except Exception as ex:
-                        traceback.print_exc(file=sys.stdout)
+                    for brief_trace in brief_trace_list:
+                        if not brief_trace:
+                            brief_trace = 'null brief trace'
+                        additional_dict = {'db_dir': db_dir,
+                                           'zip_md5': zip_md5sum,
+                                           'db_md5': db_md5_sum,
+                                           'brief_trace': brief_trace.replace(
+                                               '\'',
+                                               '\'\''),
+                                           'exception_class': exception_class,
+                                           'subject': subject,
+                                           'exception_log_time':
+                                               exception_log_time}
+                        try:
+                            flymeparser.insert_to_database(cursor, table_name,
+                                                           row,
+                                                           additional_dict)
+                        except Exception as ex:
+                            if type(ex) is pymysql.err.IntegrityError:
+                                flymeprint.warning(ex)
+                            else:
+                                traceback.print_exc(file=sys.stdout)
                 else:
                     flymeprint.error('db dir not match with db file')
                 fd.close()
