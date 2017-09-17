@@ -253,6 +253,17 @@ def parse_event_log_for_wd(root_path):
 def parse_watchdog_raw_dict(watchdog_lists):
     watchdog_formated_dict = dict()
     for file_name in watchdog_lists.keys():
+        max_time_str = None
+        prev_content = None
+        for content in watchdog_lists[file_name]:
+            time_str = flymeparser.get_watchdog_time_event_log(content)
+            if max_time_str is None:
+                max_time_str = time_str
+                prev_content = content
+            elif time_str > max_time_str:
+                max_time_str = time_str
+                watchdog_lists[file_name].remove(prev_content)
+                prev_content = content
         for content in watchdog_lists[file_name]:
             # matched_list = re.search('(^\d{2}-\d{2} (\d{2}):(\d{2}):(\d{
             # 2}))\.(\d{
