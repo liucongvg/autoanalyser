@@ -15,7 +15,8 @@ try:
     import requests
     import pymysql
 except Exception as ex:
-    traceback.print_exc(file=sys.stdout)
+    flymeprint.warning(ex)
+    # traceback.print_exc(file=sys.stdout)
 
 
 def start(excel_fn, dest_dir=None):

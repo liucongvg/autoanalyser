@@ -304,22 +304,22 @@ def parse_watchdog_raw_dict(watchdog_lists):
                          'event_log': i[0],
                          'checker_name': i[1],
                          'thread_name': i[2]})
-        # matched_list = re.findall(
-        #    '(Blocked in monitor (?P<class_name>.*?) on ('
-        #    '?P<checker_name>.*?) '
-        #    '\((?P<thread_name>.*?)\))',
-        #    content)
-        matched_list = flymeparser.get_watchdog_mlist_event_log(content)
-        if matched_list:
-            for i in matched_list:
-                watchdog_formated_dict[time_str]['checker_list'].append(
-                    {'checker_type':
-                         'monitor',
-                     'event_log': i[0],
-                     'checker_class_name':
-                         i[1],
-                     'checker_name': i[2],
-                     'thread_name': i[3]})
+                    # matched_list = re.findall(
+                    #    '(Blocked in monitor (?P<class_name>.*?) on ('
+                    #    '?P<checker_name>.*?) '
+                    #    '\((?P<thread_name>.*?)\))',
+                    #    content)
+            matched_list = flymeparser.get_watchdog_mlist_event_log(content)
+            if matched_list:
+                for i in matched_list:
+                    watchdog_formated_dict[time_str]['checker_list'].append(
+                        {'checker_type':
+                             'monitor',
+                         'event_log': i[0],
+                         'checker_class_name':
+                             i[1],
+                         'checker_name': i[2],
+                         'thread_name': i[3]})
     if len(watchdog_formated_dict) == 0:
         flymeprint.error('no watchdog found in event log')
     return watchdog_formated_dict
