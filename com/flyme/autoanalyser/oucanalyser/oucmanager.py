@@ -20,6 +20,7 @@ except Exception as ex:
 
 
 def start(excel_fn, dest_dir=None):
+    cachemanager.mtk_db_only = True
     if not dest_dir:
         dest_dir = '/home/liucong/temp/ouc/' + str(
             datetime.datetime.now().timestamp())
@@ -99,20 +100,26 @@ def extract_log_to_db(cursor, table_name, row, zip_file, zip_md5sum):
                 if exception_class == 'SWT':
                     flymeprint.debug('exception class:SWT')
                     res_dict = swtmanager.start(root)
-                    if res_dict:
-                        for i in res_dict:
+                    if res_dict and res_dict['is_swt'] and res_dict[
+                        'brief_trace']:
+                        for i in res_dict['brief_trace']:
                             if os.path.dirname(i) == db_dir:
-                                brief_trace_list.append(res_dict[i])
+                                brief_trace_list.append(
+                                    res_dict['brief_trace'][i])
                 elif exception_class == 'Java (JE)':
                     flymeprint.debug('exception class:Java (JE)')
                     res_dict = jemanager.start(root)
-                    if res_dict:
-                        brief_trace_list.append(res_dict.popitem()[1])
+                    if res_dict and res_dict['is_je'] and res_dict[
+                        'brief_trace']:
+                        brief_trace_list.append(
+                            res_dict['brief_trace'].popitem()[1])
                 elif exception_class == 'Native (NE)':
                     flymeprint.debug('exception class:Native (NE)')
                     res_dict = nemanager.start(root)
-                    if res_dict:
-                        brief_trace_list.append(res_dict.popitem()[1])
+                    if res_dict and res_dict['is_ne'] and res_dict[
+                        'brief_trace']:
+                        brief_trace_list.append(
+                            res_dict['brief_trace'].popitem()[1])
                 else:
                     flymeprint.debug(
                         'exception class:' + exception_class + ',ignored...')

@@ -233,7 +233,7 @@ def clean_files(*files):
 def extractGz(src, dest=None):
     try:
         gz = gzip.open(src, 'rb')
-        wholeFile = gz.read().decode('utf-8')
+        wholeFile = gz.read().decode(encoding='utf-8', errors='ignore')
         gz.close()
         if dest != None:
             newFile = open(dest, 'w', encoding='utf-8')
@@ -1304,7 +1304,7 @@ def get_exlt(content):
         return match.group(1)
 
 
-def get_je_trace(content):
+def get_je_db_trace(content):
     match = re.search('^Build:.*\n\n((.|\n)*?)\n\n', content, re.M)
     if not match:
         return ''
@@ -1405,3 +1405,40 @@ def write_exception_head(fd, ex_type, ex_reason, ex_final_trace,
         fd.write('null')
         flymeprint.warning('exception final trace None')
     fd.write('\n' + head_break)
+
+
+def parse_ss_je(content, pid=None):
+    if pid is None:
+        final_pid = '\d+'
+    else:
+        final_pid = pid
+    match = re.search(
+        '^(?P<time>\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3}).*? +(?P<pid>' +
+        final_pid + ') +('
+                    '?P<tid>\d+) E AndroidRuntime: \*\*\* FATAL EXCEPTION IN '
+                    'SYSTEM PROCESS: (?P<thread_name>.*)\n(?P<trace>('
+                    '.|\n)*?)\n(?!^\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3}.*?  '
+        + '\d+  \d+ E AndroidRuntime: )',
+        content, re.M)
+    if not match:
+        return None
+    return match.groupdict()
+
+
+def parse_ne(content, process_name='system_server'):
+    time_re = '^\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3}'
+    head_re = '^' + time_re + '.*? +\d+ +\d+ +F +DEBUG +: +'
+
+    match = re.search(
+        '(?P<trace>' + '(^.*\n){4}' + '(?P<time>' + time_re + ').*? +\d+ +\d+ '
+                                                              '+F '
+                                                              '+DEBUG +: +pid: '
+                                                              '+(?P<pid>\d+), '
+                                                              '+tid: +('
+                                                              '?P<tid>\d+), '
+                                                              '+name: +('
+                                                              '?P<thread_name>.*?) +>>> +(?P<process_name>' + process_name + ') +<<<\n(' + head_re + '.*\n)*?' + ')' + '^(?!' + head_re + ')',
+        content, re.M)
+    if not match:
+        return None
+    return match.groupdict()

@@ -4,6 +4,7 @@ import traceback
 import sys
 
 root_path = None
+mtk_db_only = False
 
 whole_file_cache = dict()
 am_anr_cache = dict()
@@ -15,6 +16,8 @@ cached_1 = False
 dropbox_files = list()
 data_anr_trace_files = list()
 event_log_files = list()
+main_log_txt_files = list()
+main_log_gz_files = list()
 main_log_files = list()
 
 cached_2 = False
@@ -31,7 +34,7 @@ def get_file_content(src_file, dest_file=None):
     if src_file.endswith('.gz'):
         content = flymeparser.extractGz(src_file, dest_file)
     else:
-        content = open(src_file, encoding='utf-8').read()
+        content = open(src_file, encoding='utf-8', errors='ignore').read()
     whole_file_cache[src_file] = content
     return content
 
@@ -220,8 +223,17 @@ def cache_all_file_entries():
             if flymeparser.is_fname_match(file_name, 'events.*'):
                 event_log_files.append(
                     os.path.join(current_root_dir, file_name))
-            if flymeparser.is_fname_match(file_name, 'main.*'):
-                main_log_files.append(os.path.join(current_root_dir, file_name))
+            if flymeparser.is_fname_match(file_name, 'main.*(?<!txt)$'):
+                if file_name.endswith('.gz'):
+                    main_log_gz_files.append(
+                        os.path.join(current_root_dir, file_name))
+                else:
+                    main_log_txt_files.append(
+                        os.path.join(current_root_dir, file_name))
+                    # main_log_files.append(os.path.join(current_root_dir,
+                    # file_name))
+    main_log_files.extend(main_log_txt_files)
+    # main_log_files.extend(main_log_gz_files)
 
 
 def free_cache():
@@ -257,3 +269,7 @@ def free_cache():
     db_binderif_dict = dict()
     global db_exp_main_dict
     db_exp_main_dict = dict()
+    global main_log_gz_files
+    main_log_gz_files = list()
+    global main_log_txt_files
+    main_log_txt_files = list()

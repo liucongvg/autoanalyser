@@ -14,13 +14,18 @@ def start(root_path):
 
 
 def parse_swt(root_path):
+    flymeprint.debug('try swt...')
     cachemanager.root_path = root_path
+    res = dict()
     watchdog_raw_dict = parse_event_log_for_wd(root_path)
     if not watchdog_raw_dict:
         watchdog_raw_dict = parse_db_watchdog(root_path)
     if not watchdog_raw_dict:
-        flymeprint.error('no watchdog keyword found')
-        return
+        res['is_swt'] = False
+        flymeprint.debug('no watchdog keyword found, not swt')
+        return res
+    res['is_swt'] = True
+    flymeprint.debug('swt detected...')
     watchdog_formated_dict = parse_watchdog_raw_dict(watchdog_raw_dict)
     is_sf_hang = True
     for time_str in watchdog_formated_dict:
@@ -30,23 +35,23 @@ def parse_swt(root_path):
     if not is_sf_hang:
         if not watchdog_formated_dict:
             flymeprint.error('parse_wachdog_raw_dict error')
-            return
+            return res
         system_server_trace_time_dict = parse_data_anr_trace(root_path)
         if not system_server_trace_time_dict:
             system_server_trace_time_dict = parse_db_trace(root_path)
         if not system_server_trace_time_dict:
             flymeprint.error('no system_server trace time')
-            return
+            return res
         elif len(system_server_trace_time_dict) <= 1:
             flymeprint.error(
                 'only one system_server trace found, not enough to analysis')
-            return
+            return res
         matched_trace_time = get_matched_trace_time(watchdog_formated_dict,
                                                     system_server_trace_time_dict,
                                                     False)
         if not matched_trace_time:
             flymeprint.error('no matched time')
-            return
+            return res
         pm_matched_trace_time = get_pm_matched_trace_time(
             system_server_trace_time_dict, watchdog_formated_dict)
         swtobj_dict = get_swtobj_dict(watchdog_formated_dict,
@@ -55,7 +60,8 @@ def parse_swt(root_path):
     else:
         flymeprint.debug('sf hang...')
         swtobj_dict = get_swtobj_dict(watchdog_formated_dict, None, None)
-    return generate_report(swtobj_dict, root_path)
+    res['brief_trace'] = generate_report(swtobj_dict, root_path)
+    return res
 
 
 def get_pm_matched_trace_time(system_server_trace_time_dict,
@@ -81,6 +87,8 @@ def parse_db_watchdog(root_path):
     flymeprint.debug('parsing db watchdog...')
     cachemanager.root_path = root_path
     db_event_log_files = cachemanager.get_db_event_log_files()
+    if not db_event_log_files:
+        flymeprint.warning('no db event log files found')
     return parse_event_log_for_wd_by_entries(db_event_log_files)
 
 
@@ -228,8 +236,6 @@ def get_whole_trace_dict(time_str, matched_trace_time):
 
 
 def parse_event_log_for_wd_by_entries(event_log_entries):
-    if not event_log_entries:
-        flymeprint.warning('no event log files found')
     watchdog_raw_dict = dict()
     for file_name in event_log_entries:
         content = cachemanager.get_file_content(file_name)
@@ -247,6 +253,8 @@ def parse_event_log_for_wd_by_entries(event_log_entries):
 def parse_event_log_for_wd(root_path):
     flymeprint.debug('parsing event log...')
     event_log_entries = cachemanager.get_event_log_files()
+    if not event_log_entries:
+        flymeprint.warning('no event log files found')
     return parse_event_log_for_wd_by_entries(event_log_entries)
 
 
@@ -321,7 +329,7 @@ def parse_watchdog_raw_dict(watchdog_lists):
                          'checker_name': i[2],
                          'thread_name': i[3]})
     if len(watchdog_formated_dict) == 0:
-        flymeprint.error('no watchdog found in event log')
+        flymeprint.debug('no watchdog found in event log')
     return watchdog_formated_dict
 
 
